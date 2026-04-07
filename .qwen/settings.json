@@ -6,7 +6,9 @@
       "Bash(git commit *)",
       "Bash(git push *)",
       "Bash(cargo check)",
-      "Bash(sed *)"
+      "Bash(sed *)",
+      "Bash(git *)",
+      "Bash(gh *)"
     ]
   },
   "$version": 3
