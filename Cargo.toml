@@ -24,7 +24,7 @@ colored = "2.1"
 ratatui = "0.26"
 crossterm = "0.27"
 tokio = { version = "1.36", features = ["full"], optional = true }
-reqwest = { version = "0.12", features = ["json"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
 
 [features]
 default = ["network"]
