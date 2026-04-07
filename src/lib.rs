@@ -40,21 +40,21 @@ pub fn audit_file(path: &str, options: AuditOptions) -> Result<AuditResult> {
 pub fn audit_content(content: &str, options: AuditOptions) -> Result<AuditResult> {
     let provider = parsers::detect_provider(content)?;
     let pipeline = parsers::parse(content, provider)?;
-    
+
     let mut issues = Vec::new();
-    
+
     // Run all auditors
     issues.extend(auditors::syntax::audit(&pipeline)?);
     issues.extend(auditors::dag::audit(&pipeline)?);
     issues.extend(auditors::secrets::audit(&pipeline)?);
-    
+
     #[cfg(feature = "network")]
     if options.check_docker_images {
         issues.extend(auditors::docker::audit(&pipeline)?);
     }
-    
+
     let summary = generate_summary(&issues);
-    
+
     Ok(AuditResult {
         provider,
         issues,
@@ -63,7 +63,13 @@ pub fn audit_content(content: &str, options: AuditOptions) -> Result<AuditResult
 }
 
 fn generate_summary(issues: &[Issue]) -> String {
-    let errors = issues.iter().filter(|i| i.severity == Severity::Error).count();
-    let warnings = issues.iter().filter(|i| i.severity == Severity::Warning).count();
+    let errors = issues
+        .iter()
+        .filter(|i| i.severity == Severity::Error)
+        .count();
+    let warnings = issues
+        .iter()
+        .filter(|i| i.severity == Severity::Warning)
+        .count();
     format!("{} errors, {} warnings", errors, warnings)
 }

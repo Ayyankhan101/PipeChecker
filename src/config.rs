@@ -6,7 +6,7 @@ use std::path::Path;
 pub struct Config {
     #[serde(default)]
     pub ignore: Vec<String>,
-    
+
     #[serde(default)]
     pub rules: Rules,
 }
@@ -15,10 +15,10 @@ pub struct Config {
 pub struct Rules {
     #[serde(default = "default_true")]
     pub circular_dependencies: bool,
-    
+
     #[serde(default = "default_true")]
     pub missing_secrets: bool,
-    
+
     #[serde(default = "default_true")]
     pub docker_latest_tag: bool,
 }
@@ -49,7 +49,7 @@ impl Default for Rules {
 impl Config {
     pub fn load() -> Self {
         let paths = [".pipecheckrc.yml", ".pipecheckrc.yaml", ".pipecheck.yml"];
-        
+
         for path in &paths {
             if Path::new(path).exists() {
                 if let Ok(content) = fs::read_to_string(path) {
@@ -59,15 +59,17 @@ impl Config {
                 }
             }
         }
-        
+
         Config::default()
     }
-    
+
     pub fn should_ignore(&self, file: &str) -> bool {
         self.ignore.iter().any(|pattern| {
             if pattern.contains('*') {
                 let re = pattern.replace("*", ".*");
-                regex::Regex::new(&re).map(|r| r.is_match(file)).unwrap_or(false)
+                regex::Regex::new(&re)
+                    .map(|r| r.is_match(file))
+                    .unwrap_or(false)
             } else {
                 file.contains(pattern)
             }

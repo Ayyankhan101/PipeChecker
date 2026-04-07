@@ -3,7 +3,7 @@ use crate::models::{Issue, Pipeline, Severity};
 
 pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
     let mut issues = Vec::new();
-    
+
     // Check for empty jobs
     if pipeline.jobs.is_empty() {
         issues.push(Issue {
@@ -13,7 +13,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
             suggestion: Some("Add at least one job to your pipeline".to_string()),
         });
     }
-    
+
     // Check for duplicate job IDs
     let mut seen_ids = std::collections::HashSet::new();
     for job in &pipeline.jobs {
@@ -25,7 +25,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                 suggestion: Some("Each job must have a unique ID".to_string()),
             });
         }
-        
+
         // Check for empty steps
         if job.steps.is_empty() {
             issues.push(Issue {
@@ -36,6 +36,6 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
             });
         }
     }
-    
+
     Ok(issues)
 }

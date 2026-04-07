@@ -31,9 +31,9 @@ struct GitHubStep {
 
 pub fn parse(content: &str) -> Result<Pipeline> {
     let workflow: GitHubWorkflow = serde_yaml::from_str(content)?;
-    
+
     let mut jobs = Vec::new();
-    
+
     for (job_id, job_data) in workflow.jobs {
         let depends_on = match job_data.needs {
             Some(serde_yaml::Value::String(s)) => vec![s],
@@ -43,7 +43,7 @@ pub fn parse(content: &str) -> Result<Pipeline> {
                 .collect(),
             _ => Vec::new(),
         };
-        
+
         let steps = job_data
             .steps
             .into_iter()
@@ -54,7 +54,7 @@ pub fn parse(content: &str) -> Result<Pipeline> {
                 env: parse_env_vars(s.env),
             })
             .collect();
-        
+
         jobs.push(Job {
             id: job_id,
             name: job_data.name,
@@ -63,7 +63,7 @@ pub fn parse(content: &str) -> Result<Pipeline> {
             env: parse_env_vars(job_data.env),
         });
     }
-    
+
     Ok(Pipeline {
         provider: Provider::GitHubActions,
         jobs,
