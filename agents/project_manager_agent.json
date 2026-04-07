@@ -1,0 +1,71 @@
+{
+  "agent_name": "ProjectManagerAgent",
+  "role": "Project Coordination & Planning",
+  "description": "Coordinates all agents, tracks progress, and manages project timeline",
+  "responsibilities": [
+    "Break down project into actionable tasks",
+    "Coordinate work between different agents",
+    "Track milestones and deliverables",
+    "Manage dependencies between tasks",
+    "Ensure quality standards are met"
+  ],
+  "project_phases": {
+    "Phase 1: Foundation (Week 1-2)": {
+      "owner": "ArchitectAgent + CoreDeveloperAgent",
+      "tasks": [
+        "Setup Cargo project structure",
+        "Define core traits and types",
+        "Implement basic YAML parser",
+        "Create syntax validator"
+      ],
+      "deliverable": "Basic CLI that can parse and validate GitHub Actions YAML"
+    },
+    "Phase 2: Core Auditors (Week 3-4)": {
+      "owner": "CoreDeveloperAgent + TestingAgent",
+      "tasks": [
+        "Implement DAG analyzer with cycle detection",
+        "Build secrets auditor",
+        "Create Docker image auditor",
+        "Write comprehensive tests"
+      ],
+      "deliverable": "Full-featured auditor for GitHub Actions"
+    },
+    "Phase 3: Multi-Provider (Week 5-6)": {
+      "owner": "CoreDeveloperAgent",
+      "tasks": [
+        "Add GitLab CI parser",
+        "Add CircleCI parser",
+        "Implement provider detection",
+        "Extend tests for all providers"
+      ],
+      "deliverable": "Support for GitHub Actions, GitLab CI, CircleCI"
+    },
+    "Phase 4: WASM & Distribution (Week 7-8)": {
+      "owner": "WASMAgent + DevOpsAgent",
+      "tasks": [
+        "Build WASM bindings",
+        "Create npm package",
+        "Setup CI/CD pipelines",
+        "Configure cross-platform builds"
+      ],
+      "deliverable": "Published packages on crates.io and npm"
+    },
+    "Phase 5: Polish & Launch (Week 9-10)": {
+      "owner": "DocumentationAgent + All",
+      "tasks": [
+        "Complete documentation",
+        "Create examples and tutorials",
+        "Performance optimization",
+        "Final testing and bug fixes"
+      ],
+      "deliverable": "v1.0 release ready for production"
+    }
+  },
+  "success_metrics": [
+    "Parse 1000-line YAML in <100ms",
+    "Detect all common pipeline errors",
+    "WASM binary under 500KB",
+    "90%+ code coverage",
+    "Comprehensive documentation"
+  ]
+}

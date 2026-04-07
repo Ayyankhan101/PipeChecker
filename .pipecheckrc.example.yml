@@ -1,0 +1,14 @@
+# Pipecheck Configuration File
+# Place this file in your project root as .pipecheckrc.yml
+
+# Files/patterns to ignore
+ignore:
+  - .github/workflows/old-*.yml
+  - .github/workflows/experimental/
+  - .github/workflows/draft-*.yml
+
+# Rule configuration
+rules:
+  circular_dependencies: true  # Check for circular job dependencies
+  missing_secrets: true         # Warn about secrets usage
+  docker_latest_tag: true       # Warn about :latest Docker tags

@@ -1,0 +1,46 @@
+{
+  "name": "pipecheck",
+  "version": "0.0.1",
+  "description": "CI/CD Pipeline Auditor - Catch errors before you push",
+  "bin": {
+    "pipecheck": "./bin/pipecheck.js"
+  },
+  "scripts": {
+    "postinstall": "node ./scripts/install.js",
+    "build": "cargo build --release"
+  },
+  "keywords": [
+    "ci",
+    "cd",
+    "pipeline",
+    "audit",
+    "github-actions",
+    "gitlab-ci",
+    "circleci",
+    "yaml",
+    "validation"
+  ],
+  "author": "Pipecheck Contributors",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ayyankhan101/PipeCheck.git"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "files": [
+    "bin/",
+    "scripts/",
+    "npm/"
+  ]
+}

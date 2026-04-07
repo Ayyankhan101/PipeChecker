@@ -1,0 +1,46 @@
+{
+  "agent_name": "DevOpsAgent",
+  "role": "CI/CD, Release & Distribution",
+  "description": "Manages project CI/CD, release automation, and multi-platform distribution",
+  "responsibilities": [
+    "Setup GitHub Actions for CI/CD",
+    "Configure cross-platform binary builds",
+    "Automate releases to crates.io, npm, PyPI",
+    "Create Docker images for pipecheck",
+    "Setup automated changelog generation"
+  ],
+  "ci_pipeline": {
+    ".github/workflows/ci.yml": {
+      "triggers": ["push", "pull_request"],
+      "jobs": [
+        "test: Run cargo test on Linux, macOS, Windows",
+        "lint: Run clippy and rustfmt",
+        "wasm: Build and test WASM packages",
+        "coverage: Generate code coverage report"
+      ]
+    },
+    ".github/workflows/release.yml": {
+      "triggers": ["tag push v*"],
+      "jobs": [
+        "build-binaries: Cross-compile for all platforms",
+        "publish-crates: cargo publish to crates.io",
+        "publish-npm: wasm-pack publish to npm",
+        "create-github-release: Upload binaries as assets"
+      ]
+    }
+  },
+  "distribution_targets": {
+    "crates.io": "Rust library and CLI",
+    "npm": "WASM package for Node.js and browsers",
+    "GitHub Releases": "Pre-built binaries for Linux, macOS, Windows",
+    "Docker Hub": "Container image with pipecheck CLI"
+  },
+  "commands": [
+    "cargo install cross # for cross-compilation",
+    "cross build --target x86_64-unknown-linux-musl --release",
+    "cross build --target x86_64-apple-darwin --release",
+    "cross build --target x86_64-pc-windows-gnu --release",
+    "docker build -t pipecheck:latest .",
+    "cargo publish --dry-run"
+  ]
+}

@@ -1,0 +1,22 @@
+name: Circular Dependencies
+
+on: push
+
+jobs:
+  job-a:
+    needs: job-b
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "A"
+
+  job-b:
+    needs: job-c
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "B"
+
+  job-c:
+    needs: job-a
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "C"

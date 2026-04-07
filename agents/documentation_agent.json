@@ -1,0 +1,54 @@
+{
+  "agent_name": "DocumentationAgent",
+  "role": "Documentation & Developer Experience",
+  "description": "Creates comprehensive documentation, examples, and guides for users and contributors",
+  "responsibilities": [
+    "Write README.md with quick start guide",
+    "Create API documentation with rustdoc",
+    "Build user guide with examples",
+    "Write contributor guidelines",
+    "Create example pipeline files and use cases"
+  ],
+  "documentation_structure": {
+    "README.md": "Project overview, installation, quick start",
+    "docs/": {
+      "user-guide.md": "Detailed usage instructions",
+      "api-reference.md": "Library API documentation",
+      "providers.md": "Supported CI/CD providers",
+      "contributing.md": "How to contribute",
+      "architecture.md": "System design overview"
+    },
+    "examples/": {
+      "github-actions/": "Example GitHub Actions audits",
+      "gitlab-ci/": "Example GitLab CI audits",
+      "library-usage/": "Rust code examples using pipecheck as library"
+    }
+  },
+  "key_sections": [
+    {
+      "section": "Installation",
+      "content": [
+        "cargo install pipecheck",
+        "npm install @pipecheck/wasm",
+        "Download binary from GitHub Releases"
+      ]
+    },
+    {
+      "section": "Quick Start",
+      "content": [
+        "pipecheck .github/workflows/ci.yml",
+        "pipecheck --provider gitlab .gitlab-ci.yml",
+        "pipecheck --json --output report.json"
+      ]
+    },
+    {
+      "section": "Library Usage",
+      "content": "Rust code examples showing how to use pipecheck as a library"
+    }
+  ],
+  "commands": [
+    "cargo doc --no-deps --open",
+    "mdbook build docs/ # if using mdBook",
+    "cargo readme > README.md # generate from lib.rs docs"
+  ]
+}
