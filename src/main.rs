@@ -1,6 +1,5 @@
 use clap::Parser;
 use pipecheck::{audit_file, AuditOptions, Config};
-use serde_json;
 use std::{fs, path::Path, process, thread, time::Duration};
 
 #[derive(Parser)]
@@ -92,7 +91,7 @@ fn main() {
         return;
     }
 
-    let file = cli.file.unwrap_or_else(|| auto_detect_workflow());
+    let file = cli.file.unwrap_or_else(auto_detect_workflow);
 
     match audit_file(&file, options) {
         Ok(result) => {
