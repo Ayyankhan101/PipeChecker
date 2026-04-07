@@ -8,7 +8,7 @@ jobs:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false        # ← FIX 1: don't cancel all jobs on one failure
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -32,7 +32,7 @@ jobs:
             artifact_name: pipecheck.exe
             asset_name: pipecheck-x64.exe
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -44,7 +44,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      # ← FIX 2: Tell Cargo which linker to use for aarch64
       - name: Configure aarch64 linker
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
@@ -67,7 +66,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -75,7 +74,7 @@ jobs:
           path: artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2   # ← FIX 3: v1 is deprecated
+        uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
           generate_release_notes: true
@@ -86,11 +85,11 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'    # ← FIX 4: node 18 is EOL
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Download all artifacts
@@ -98,7 +97,6 @@ jobs:
         with:
           path: npm
 
-      # ← FIX 5: chmod only applies to files, not directories
       - name: Prepare npm package
         run: |
           find npm -type f -name 'pipecheck*' -exec chmod +x {} \;
@@ -110,7 +108,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
 
