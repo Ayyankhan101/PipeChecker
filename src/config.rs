@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub ignore: Vec<String>,
@@ -27,15 +27,7 @@ fn default_true() -> bool {
     true
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            ignore: Vec::new(),
-            rules: Rules::default(),
-        }
-    }
-}
-
+#[allow(clippy::derivable_impls)]
 impl Default for Rules {
     fn default() -> Self {
         Rules {
