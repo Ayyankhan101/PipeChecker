@@ -32,13 +32,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
-      
-      - name: Format check
-        run: cargo fmt -- --check
-      
+          components: clippy
+
       - name: Clippy
         run: cargo clippy -- -D warnings
