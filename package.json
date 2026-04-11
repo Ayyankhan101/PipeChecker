@@ -1,6 +1,6 @@
 {
   "name": "pipechecker",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "CI/CD Pipeline Auditor - Catch errors before you push",
   "bin": {
     "pipechecker": "./bin/pipechecker.js"
