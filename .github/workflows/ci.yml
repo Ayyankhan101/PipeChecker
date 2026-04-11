@@ -103,11 +103,11 @@ jobs:
           restore-keys: |
             security-cargo-
 
-      - name: Install cargo-audit
+      - name: Cache cargo-audit binary
         uses: actions/cache@v4
         with:
-          path: ~/.cargo/bin/
-          key: cargo-audit
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-bin
 
       - name: Install cargo-audit
         run: cargo install cargo-audit --force
@@ -162,8 +162,7 @@ jobs:
         run: cargo doc --no-deps --document-private-items
 
       - name: Check for warnings
-        run: |
-          RUSTDOCFLAGS="-A warnings" cargo doc --no-deps --document-private-items
+        run: RUSTDOCFLAGS="-A warnings" cargo doc --no-deps --document-private-items
 
   coverage:
     runs-on: ubuntu-latest
@@ -238,35 +237,23 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             sccache-arch: x86_64-unknown-linux-musl
+
           - os: macos-latest
-            target: x86_64-apple-darwin
-            sccache-arch: x86_64-apple-darwin
+            target: aarch64-apple-darwin
+            sccache-arch: aarch64-apple-darwin
+
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             sccache-arch: x86_64-pc-windows-msvc
-          - os: ubuntu-latest-arm64
+
+          # ARM64 Linux via cross-compilation (works on free GitHub plans)
+          - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             sccache-arch: x86_64-unknown-linux-musl
-          - os: macos-latest-arm64
-            target: aarch64-apple-darwin
-            sccache-arch: x86_64-apple-darwin
+            use-cross: true
+
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install aarch64-linux-gnu cross-compilation toolchain
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-
-      - name: Configure aarch64-linux-gnu linker
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          mkdir -p .cargo
-          cat >> .cargo/config.toml << 'EOF'
-          [target.aarch64-unknown-linux-gnu]
-          linker = "aarch64-linux-gnu-gcc"
-          EOF
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -315,14 +302,30 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-
 
-      - name: Build
+      - name: Install cross
+        if: matrix.use-cross == true
+        run: cargo install cross --quiet
+
+      - name: Build (cross)
+        if: matrix.use-cross == true
+        shell: bash
+        run: cross build --target ${{ matrix.target }}
+
+      - name: Build (native)
+        if: matrix.use-cross != true
         shell: bash
         run: RUSTC_WRAPPER=$CARGO_HOME/bin/sccache cargo build --target ${{ matrix.target }}
 
-      - name: Run tests
+      - name: Run tests (cross)
+        if: matrix.use-cross == true
+        run: cross test --target ${{ matrix.target }}
+
+      - name: Run tests (native)
+        if: matrix.use-cross != true
         run: cargo test --target ${{ matrix.target }}
 
       - name: Test CLI
+        if: matrix.use-cross != true
         run: |
           cargo run -- -- tests/fixtures/github/valid.yml
           cargo run -- tests/fixtures/github/circular.yml || true
@@ -338,15 +341,15 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             sccache-arch: x86_64-unknown-linux-musl
+
           - os: macos-latest
-            target: x86_64-apple-darwin
-            sccache-arch: x86_64-apple-darwin
+            target: aarch64-apple-darwin
+            sccache-arch: aarch64-apple-darwin
+
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             sccache-arch: x86_64-pc-windows-msvc
-          - os: macos-latest-arm64
-            target: aarch64-apple-darwin
-            sccache-arch: x86_64-apple-darwin
+
     steps:
       - uses: actions/checkout@v4
 
