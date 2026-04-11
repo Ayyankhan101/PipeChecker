@@ -81,11 +81,11 @@ jobs:
             docs-cargo-
 
       - name: Build documentation
-        run: cargo doc --no-deps --document-private-items --no-emit
+        run: cargo doc --no-deps --document-private-items
 
       - name: Check for warnings
         run: |
-          RUSTDOCFLAGS="-A warnings" cargo doc --no-deps --document-private-items --no-emit
+          RUSTDOCFLAGS="-A warnings" cargo doc --no-deps --document-private-items
 
   coverage:
     runs-on: ubuntu-latest
