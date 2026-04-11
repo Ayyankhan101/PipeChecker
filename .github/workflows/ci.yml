@@ -40,6 +40,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
+        shell: bash
         run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
@@ -55,6 +56,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Clippy
+        shell: bash
         run: RUSTC_WRAPPER=$CARGO_HOME/bin/sccache cargo clippy -- -D warnings
 
       - name: Formatting check
@@ -87,6 +89,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
+        shell: bash
         run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
@@ -141,6 +144,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
+        shell: bash
         run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
@@ -190,6 +194,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
+        shell: bash
         run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
@@ -287,6 +292,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
+        shell: bash
         run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
@@ -367,6 +373,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
+        shell: bash
         run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
