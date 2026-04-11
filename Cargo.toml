@@ -1,5 +1,5 @@
 [package]
-name = "pipecheck"
+name = "pipechecker"
 version = "0.2.1"
 edition = "2021"
 authors = ["Pipecheck Contributors"]
@@ -7,7 +7,7 @@ description = "CI/CD Pipeline Auditor - Catch errors before you push"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Ayyankhan101/PipeCheck"
 homepage = "https://github.com/Ayyankhan101/PipeCheck"
-documentation = "https://docs.rs/pipecheck"
+documentation = "https://docs.rs/pipechecker"
 readme = "README.md"
 keywords = ["ci", "cd", "pipeline", "audit", "yaml"]
 categories = ["command-line-utilities", "development-tools"]
@@ -40,7 +40,7 @@ version = "0.2"
 optional = true
 
 [[bin]]
-name = "pipecheck"
+name = "pipechecker"
 path = "src/main.rs"
 
 [dev-dependencies]

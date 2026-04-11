@@ -1,9 +1,9 @@
 use clap::Parser;
-use pipecheck::{audit_file, AuditOptions, Config};
+use pipechecker::{audit_file, AuditOptions, Config};
 use std::{fs, path::Path, process, thread, time::Duration};
 
 #[derive(Parser)]
-#[command(name = "pipecheck")]
+#[command(name = "pipechecker")]
 #[command(version)]
 #[command(about = "CI/CD Pipeline Auditor - Catch errors before you push", long_about = None)]
 struct Cli {
@@ -62,7 +62,7 @@ fn main() {
             check_docker_images: !cli.no_docker,
             strict_mode: cli.strict,
         };
-        if let Err(e) = pipecheck::tui::run_tui(options) {
+        if let Err(e) = pipechecker::tui::run_tui(options) {
             eprintln!("TUI error: {}", e);
             process::exit(1);
         }
@@ -104,9 +104,9 @@ fn main() {
 
                 for issue in &result.issues {
                     let prefix = match issue.severity {
-                        pipecheck::Severity::Error => "❌ ERROR",
-                        pipecheck::Severity::Warning => "⚠️  WARNING",
-                        pipecheck::Severity::Info => "ℹ️  INFO",
+                        pipechecker::Severity::Error => "❌ ERROR",
+                        pipechecker::Severity::Warning => "⚠️  WARNING",
+                        pipechecker::Severity::Info => "ℹ️  INFO",
                     };
                     print!("{}: {}", prefix, issue.message);
 
@@ -130,7 +130,7 @@ fn main() {
             let has_errors = result
                 .issues
                 .iter()
-                .any(|i| i.severity == pipecheck::Severity::Error);
+                .any(|i| i.severity == pipechecker::Severity::Error);
 
             if has_errors || (cli.strict && !result.issues.is_empty()) {
                 process::exit(1);
@@ -174,7 +174,7 @@ fn auto_detect_workflow() -> String {
     }
 
     eprintln!("❌ No workflow files found. Please specify a file:");
-    eprintln!("   pipecheck <FILE>");
+    eprintln!("   pipechecker <FILE>");
     eprintln!("\nSearched for:");
     eprintln!("  - .github/workflows/*.yml");
     eprintln!("  - .gitlab-ci.yml");
@@ -193,13 +193,13 @@ fn install_git_hook() {
     let hook_content = r#"#!/bin/bash
 # Pipecheck pre-commit hook
 
-echo "🔍 Checking workflows with pipecheck..."
+echo "🔍 Checking workflows with pipechecker..."
 
 WORKFLOW_FILES=$(git diff --cached --name-only | grep -E '(\.github/workflows|\.gitlab-ci|\.circleci).*\.ya?ml$')
 
 if [ -n "$WORKFLOW_FILES" ]; then
-    if command -v pipecheck &> /dev/null; then
-        pipecheck --all --strict
+    if command -v pipechecker &> /dev/null; then
+        pipechecker --all --strict
         if [ $? -ne 0 ]; then
             echo ""
             echo "❌ Workflow validation failed!"
@@ -208,7 +208,7 @@ if [ -n "$WORKFLOW_FILES" ]; then
         fi
         echo "✅ All workflows valid!"
     else
-        echo "⚠️  pipecheck not installed, skipping"
+        echo "⚠️  pipechecker not installed, skipping"
     fi
 fi
 "#;
@@ -364,12 +364,12 @@ fn audit_all_workflows(options: AuditOptions, format: &str, strict: bool) {
                     let errors = result
                         .issues
                         .iter()
-                        .filter(|i| i.severity == pipecheck::Severity::Error)
+                        .filter(|i| i.severity == pipechecker::Severity::Error)
                         .count();
                     let warnings = result
                         .issues
                         .iter()
-                        .filter(|i| i.severity == pipecheck::Severity::Warning)
+                        .filter(|i| i.severity == pipechecker::Severity::Warning)
                         .count();
 
                     total_errors += errors;
@@ -378,10 +378,10 @@ fn audit_all_workflows(options: AuditOptions, format: &str, strict: bool) {
                     if errors > 0 || warnings > 0 {
                         println!("   {} errors, {} warnings", errors, warnings);
                         for issue in &result.issues {
-                            if issue.severity != pipecheck::Severity::Info {
+                            if issue.severity != pipechecker::Severity::Info {
                                 let prefix = match issue.severity {
-                                    pipecheck::Severity::Error => "❌",
-                                    pipecheck::Severity::Warning => "⚠️",
+                                    pipechecker::Severity::Error => "❌",
+                                    pipechecker::Severity::Warning => "⚠️",
                                     _ => "ℹ️",
                                 };
                                 println!("   {} {}", prefix, issue.message);

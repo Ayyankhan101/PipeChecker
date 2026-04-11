@@ -13,24 +13,24 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: pipecheck
-            asset_name: pipecheck-linux-x64
+            artifact_name: pipechecker
+            asset_name: pipechecker-linux-x64
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            artifact_name: pipecheck
-            asset_name: pipecheck-linux-arm64
+            artifact_name: pipechecker
+            asset_name: pipechecker-linux-arm64
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: pipecheck
-            asset_name: pipecheck-darwin-x64
+            artifact_name: pipechecker
+            asset_name: pipechecker-darwin-x64
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: pipecheck
-            asset_name: pipecheck-darwin-arm64
+            artifact_name: pipechecker
+            asset_name: pipechecker-darwin-arm64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: pipecheck.exe
-            asset_name: pipecheck-x64.exe
+            artifact_name: pipechecker.exe
+            asset_name: pipechecker-x64.exe
     steps:
       - uses: actions/checkout@v4
 
@@ -103,7 +103,7 @@ jobs:
 
       - name: Prepare npm package
         run: |
-          find npm -type f -name 'pipecheck*' -exec chmod +x {} \;
+          find npm -type f -name 'pipechecker*' -exec chmod +x {} \;
           npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

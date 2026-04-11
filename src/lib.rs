@@ -1,4 +1,4 @@
-//! # pipecheck
+//! # pipechecker
 //!
 //! A Rust-native CI/CD pipeline auditor that catches errors before you push.
 //!

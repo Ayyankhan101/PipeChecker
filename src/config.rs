@@ -40,7 +40,11 @@ impl Default for Rules {
 
 impl Config {
     pub fn load() -> Self {
-        let paths = [".pipecheckrc.yml", ".pipecheckrc.yaml", ".pipecheck.yml"];
+        let paths = [
+            ".pipecheckerrc.yml",
+            ".pipecheckerrc.yaml",
+            ".pipechecker.yml",
+        ];
 
         for path in &paths {
             if Path::new(path).exists() {

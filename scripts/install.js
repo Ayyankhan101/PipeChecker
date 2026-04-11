@@ -13,9 +13,9 @@ function getBinaryName() {
   const arch = process.arch;
 
   if (platform === 'win32') {
-    return `pipecheck-${arch}.exe`;
+    return `pipechecker-${arch}.exe`;
   }
-  return `pipecheck-${platform}-${arch}`;
+  return `pipechecker-${platform}-${arch}`;
 }
 
 function getReleaseAssetName() {
@@ -23,9 +23,9 @@ function getReleaseAssetName() {
   const arch = process.arch;
 
   if (platform === 'win32') {
-    return `pipecheck-${arch}.exe`;
+    return `pipechecker-${arch}.exe`;
   }
-  return `pipecheck-${platform}-${arch}`;
+  return `pipechecker-${platform}-${arch}`;
 }
 
 function download(url, dest) {
@@ -70,7 +70,7 @@ async function install() {
     fs.mkdirSync(npmDir, { recursive: true });
   }
 
-  console.log(`Installing pipecheck v${VERSION}...`);
+  console.log(`Installing pipechecker v${VERSION}...`);
 
   const tag = `v${VERSION}`;
   const url = `https://github.com/${REPO}/releases/download/${tag}/${assetName}`;
@@ -86,7 +86,7 @@ async function install() {
     try {
       execSync('cargo build --release', { stdio: 'inherit' });
       const sourceBinary = path.join(__dirname, '..', 'target', 'release',
-        process.platform === 'win32' ? 'pipecheck.exe' : 'pipecheck');
+        process.platform === 'win32' ? 'pipechecker.exe' : 'pipechecker');
       fs.copyFileSync(sourceBinary, binaryPath);
       fs.chmodSync(binaryPath, 0o755);
       console.log('✓ Pipecheck installed from source');
