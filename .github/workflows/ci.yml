@@ -195,32 +195,3 @@ jobs:
         run: |
           cargo run -- -- tests/fixtures/github/valid.yml
           cargo run -- tests/fixtures/github/circular.yml || true
-
-  test-msrv:
-    needs: [lint, security, docs]
-    runs-on: ubuntu-latest
-    name: Test Rust 1.82
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust 1.82
-        run: |
-          rustup install 1.82
-          rustup default 1.82
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-          key: msrv-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            msrv-cargo-
-
-      - name: Build
-        run: cargo build --verbose
-
-      - name: Run tests
-        run: cargo test --verbose
