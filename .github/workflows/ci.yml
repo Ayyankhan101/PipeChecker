@@ -266,11 +266,11 @@ jobs:
       - name: Download sccache
         run: |
           SCCACHE_VERSION=0.8.0
-          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${matrix.sccache-arch}.tar.gz"
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${{ matrix.sccache-arch }}.tar.gz"
           curl -L "$SCCACHE_URL" -o sccache.tar.gz
           tar -xzf sccache.tar.gz
           mkdir -p $CARGO_HOME/bin/
-          mv sccache-v${SCCACHE_VERSION}-${matrix.sccache-arch}/sccache $CARGO_HOME/bin/
+          mv sccache-v${SCCACHE_VERSION}-${{ matrix.sccache-arch }}/sccache $CARGO_HOME/bin/
           chmod +x $CARGO_HOME/bin/sccache
 
       - name: Cache sccache
@@ -345,11 +345,11 @@ jobs:
       - name: Download sccache
         run: |
           SCCACHE_VERSION=0.8.0
-          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${matrix.sccache-arch}.tar.gz"
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${{ matrix.sccache-arch }}.tar.gz"
           curl -L "$SCCACHE_URL" -o sccache.tar.gz
           tar -xzf sccache.tar.gz
           mkdir -p $CARGO_HOME/bin/
-          mv sccache-v${SCCACHE_VERSION}-${matrix.sccache-arch}/sccache $CARGO_HOME/bin/
+          mv sccache-v${SCCACHE_VERSION}-${{ matrix.sccache-arch }}/sccache $CARGO_HOME/bin/
           chmod +x $CARGO_HOME/bin/sccache
 
       - name: Cache sccache
