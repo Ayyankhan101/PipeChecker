@@ -316,6 +316,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-
 
       - name: Build
+        shell: bash
         run: RUSTC_WRAPPER=$CARGO_HOME/bin/sccache cargo build --target ${{ matrix.target }}
 
       - name: Run tests
@@ -397,6 +398,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-
 
       - name: Build
+        shell: bash
         run: RUSTC_WRAPPER=$CARGO_HOME/bin/sccache cargo build --target ${{ matrix.target }}
 
       - name: Run tests
