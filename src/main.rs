@@ -1,6 +1,42 @@
 use clap::Parser;
-use pipechecker::{audit_file, AuditOptions, Config};
+use pipechecker::{audit_file, discover_workflows, load_config, AuditOptions, DiscoveryOptions};
 use std::{fs, path::Path, process, thread, time::Duration};
+
+/// Auto-detect a single workflow file from common patterns.
+/// Uses `discover_workflows` under the hood, then prefers known filenames.
+fn auto_detect_workflow() -> String {
+    let files = discover_workflows(Path::new("."), &DiscoveryOptions::default());
+
+    // Try common naming patterns first
+    let common_patterns = [
+        ".github/workflows/ci.yml",
+        ".github/workflows/main.yml",
+        ".github/workflows/build.yml",
+        ".gitlab-ci.yml",
+        ".circleci/config.yml",
+    ];
+
+    for pattern in &common_patterns {
+        if files.iter().any(|f| f == pattern) {
+            eprintln!("✓ Auto-detected: {}", pattern);
+            return pattern.to_string();
+        }
+    }
+
+    // Return first discovered file
+    if let Some(first) = files.first() {
+        eprintln!("✓ Auto-detected: {}", first);
+        return first.clone();
+    }
+
+    eprintln!("❌ No workflow files found. Please specify a file:");
+    eprintln!("   pipechecker <FILE>");
+    eprintln!("\nSearched for:");
+    eprintln!("  - .github/workflows/*.yml");
+    eprintln!("  - .gitlab-ci.yml");
+    eprintln!("  - .circleci/config.yml");
+    process::exit(1)
+}
 
 #[derive(Parser)]
 #[command(name = "pipechecker")]
@@ -35,9 +71,9 @@ struct Cli {
     #[arg(short, long, default_value = "text")]
     format: String,
 
-    /// Skip Docker image checks
+    /// Skip action pinning and Docker image checks
     #[arg(long)]
-    no_docker: bool,
+    no_pinning: bool,
 
     /// Enable strict mode (warnings as errors)
     #[arg(short, long)]
@@ -59,7 +95,7 @@ fn main() {
 
     if cli.tui {
         let options = AuditOptions {
-            check_docker_images: !cli.no_docker,
+            check_docker_images: !cli.no_pinning,
             strict_mode: cli.strict,
         };
         if let Err(e) = pipechecker::tui::run_tui(options) {
@@ -70,19 +106,35 @@ fn main() {
     }
 
     if cli.fix {
-        eprintln!("🔧 Auto-fix mode");
-        eprintln!("⚠️  This feature is experimental");
-        eprintln!("   Currently supports:");
-        eprintln!("   - Fixing indentation");
-        eprintln!("   - Adding missing fields");
-        eprintln!();
-        eprintln!("❌ Auto-fix not yet implemented");
-        eprintln!("   Coming in next version!");
-        process::exit(1);
+        println!("🔧 Auto-fix mode\n");
+
+        let file = cli.file.unwrap_or_else(auto_detect_workflow);
+
+        match pipechecker::fix::fix_file(&file) {
+            Ok(result) => {
+                if result.fixed == 0 {
+                    println!("✅ No fixable issues found in {}", file);
+                    println!("   All actions are already pinned or use local references");
+                } else {
+                    println!("✨ Fixed {} issue(s) in {}:\n", result.fixed, file);
+                    for change in &result.changes {
+                        if change.starts_with("  ") {
+                            println!("{}", change);
+                        }
+                    }
+                    println!("\n💡 Review the changes and commit them!");
+                }
+            }
+            Err(e) => {
+                eprintln!("❌ Error fixing {}: {}", file, e);
+                process::exit(1);
+            }
+        }
+        process::exit(0);
     }
 
     let options = AuditOptions {
-        check_docker_images: !cli.no_docker,
+        check_docker_images: !cli.no_pinning,
         strict_mode: cli.strict,
     };
 
@@ -141,45 +193,6 @@ fn main() {
             process::exit(1);
         }
     }
-}
-
-fn auto_detect_workflow() -> String {
-    let patterns = vec![
-        ".github/workflows/ci.yml",
-        ".github/workflows/main.yml",
-        ".github/workflows/build.yml",
-        ".gitlab-ci.yml",
-        ".circleci/config.yml",
-    ];
-
-    for pattern in patterns {
-        if Path::new(pattern).exists() {
-            eprintln!("✓ Auto-detected: {}", pattern);
-            return pattern.to_string();
-        }
-    }
-
-    // Check all files in .github/workflows/
-    if let Ok(entries) = fs::read_dir(".github/workflows") {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("yml")
-                || path.extension().and_then(|s| s.to_str()) == Some("yaml")
-            {
-                let path_str = path.to_string_lossy().to_string();
-                eprintln!("✓ Auto-detected: {}", path_str);
-                return path_str;
-            }
-        }
-    }
-
-    eprintln!("❌ No workflow files found. Please specify a file:");
-    eprintln!("   pipechecker <FILE>");
-    eprintln!("\nSearched for:");
-    eprintln!("  - .github/workflows/*.yml");
-    eprintln!("  - .gitlab-ci.yml");
-    eprintln!("  - .circleci/config.yml");
-    process::exit(1);
 }
 
 fn install_git_hook() {
@@ -251,7 +264,7 @@ fn watch_mode(cli: &Cli) {
 
     // Initial check
     let options = AuditOptions {
-        check_docker_images: !cli.no_docker,
+        check_docker_images: !cli.no_pinning,
         strict_mode: cli.strict,
     };
 
@@ -264,28 +277,13 @@ fn watch_mode(cli: &Cli) {
     loop {
         thread::sleep(Duration::from_secs(2));
 
-        let mut files = Vec::new();
-
-        if cli.all {
-            if let Ok(entries) = fs::read_dir(".github/workflows") {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.extension().and_then(|s| s.to_str()) == Some("yml")
-                        || path.extension().and_then(|s| s.to_str()) == Some("yaml")
-                    {
-                        files.push(path.to_string_lossy().to_string());
-                    }
-                }
-            }
-            if Path::new(".gitlab-ci.yml").exists() {
-                files.push(".gitlab-ci.yml".to_string());
-            }
-            if Path::new(".circleci/config.yml").exists() {
-                files.push(".circleci/config.yml".to_string());
-            }
+        let files = if cli.all {
+            discover_workflows(Path::new("."), &DiscoveryOptions::default())
         } else if let Some(file) = &cli.file {
-            files.push(file.clone());
-        }
+            vec![file.clone()]
+        } else {
+            continue;
+        };
 
         for file in &files {
             if let Ok(metadata) = fs::metadata(file) {
@@ -298,7 +296,7 @@ fn watch_mode(cli: &Cli) {
                     if changed {
                         eprintln!("\n🔄 File changed: {}", file);
                         let opts = AuditOptions {
-                            check_docker_images: !cli.no_docker,
+                            check_docker_images: !cli.no_pinning,
                             strict_mode: cli.strict,
                         };
                         let _ = audit_file(file, opts);
@@ -312,27 +310,8 @@ fn watch_mode(cli: &Cli) {
 }
 
 fn audit_all_workflows(options: AuditOptions, format: &str, strict: bool) {
-    let config = Config::load();
-    let mut all_files = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(".github/workflows") {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("yml")
-                || path.extension().and_then(|s| s.to_str()) == Some("yaml")
-            {
-                all_files.push(path.to_string_lossy().to_string());
-            }
-        }
-    }
-
-    if Path::new(".gitlab-ci.yml").exists() {
-        all_files.push(".gitlab-ci.yml".to_string());
-    }
-
-    if Path::new(".circleci/config.yml").exists() {
-        all_files.push(".circleci/config.yml".to_string());
-    }
+    let config = load_config();
+    let all_files = discover_workflows(Path::new("."), &DiscoveryOptions::default());
 
     if all_files.is_empty() {
         eprintln!("❌ No workflow files found");

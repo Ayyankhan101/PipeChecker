@@ -62,7 +62,7 @@ async function install() {
 
   // Check if binary already exists
   if (fs.existsSync(binaryPath)) {
-    console.log('✓ Pipecheck binary already installed');
+    console.log('✓ Pipechecker binary already installed');
     return;
   }
 
@@ -78,7 +78,7 @@ async function install() {
   try {
     await download(url, binaryPath);
     fs.chmodSync(binaryPath, 0o755);
-    console.log('✓ Pipecheck installed successfully');
+    console.log('✓ Pipechecker installed successfully');
   } catch (error) {
     console.error(`Failed to download binary from ${url}`);
     console.error('Falling back to building from source...');
@@ -89,7 +89,7 @@ async function install() {
         process.platform === 'win32' ? 'pipechecker.exe' : 'pipechecker');
       fs.copyFileSync(sourceBinary, binaryPath);
       fs.chmodSync(binaryPath, 0o755);
-      console.log('✓ Pipecheck installed from source');
+      console.log('✓ Pipechecker installed from source');
     } catch (buildError) {
       console.error('Failed to build from source. Please ensure Rust is installed.');
       console.error('Visit https://rustup.rs to install Rust');

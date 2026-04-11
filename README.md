@@ -1,29 +1,29 @@
-# 🔍 Pipecheck
+# 🔍 Pipechecker
 
 [![CI](https://github.com/Ayyankhan101/PipeCheck/workflows/CI/badge.svg)](https://github.com/Ayyankhan101/PipeCheck/actions)
-[![Crates.io](https://img.shields.io/crates/v/pipecheck.svg)](https://crates.io/crates/pipecheck)
-[![npm](https://img.shields.io/npm/v/pipecheck.svg)](https://www.npmjs.com/package/pipecheck)
+[![Crates.io](https://img.shields.io/crates/v/pipechecker.svg)](https://crates.io/crates/pipechecker)
+[![npm](https://img.shields.io/npm/v/pipechecker.svg)](https://www.npmjs.com/package/pipechecker)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
 
 **A blazingly fast CI/CD pipeline auditor that catches errors before you push.**
 
-Stop wasting time debugging CI failures. Pipecheck validates your GitHub Actions, GitLab CI, and CircleCI configurations locally, catching syntax errors, circular dependencies, and security issues instantly.
+Stop wasting time debugging CI failures. Pipechecker validates your GitHub Actions, GitLab CI, and CircleCI configurations locally, catching syntax errors, circular dependencies, and security issues instantly.
 
 ## 🚀 Quick Start
 
 ### Install via npm (recommended)
 ```bash
-npm install -g pipecheck
+npm install -g pipechecker
 ```
 
 ### Install via Cargo
 ```bash
-cargo install pipecheck
+cargo install pipechecker
 ```
 
 ### Run
 ```bash
-pipecheck .github/workflows/ci.yml
+pipechecker .github/workflows/ci.yml
 ```
 
 ## ✨ Features
@@ -36,9 +36,9 @@ pipecheck .github/workflows/ci.yml
 - ⚡ **Fast** - Written in Rust for maximum performance
 - 🎯 **Zero Config** - Works out of the box
 
-## 💡 Why Pipecheck?
+## 💡 Why Pipechecker?
 
-**Before Pipecheck:**
+**Before Pipechecker:**
 ```
 git push
 → Wait 5 minutes
@@ -48,9 +48,9 @@ git push
 → Wait 5 minutes...
 ```
 
-**With Pipecheck:**
+**With Pipechecker:**
 ```
-pipecheck .github/workflows/ci.yml
+pipechecker .github/workflows/ci.yml
 → ❌ ERROR: Circular dependency detected: job-a -> job-c -> job-b
 → Fix immediately
 → git push with confidence ✅
@@ -62,16 +62,16 @@ pipecheck .github/workflows/ci.yml
 
 ```bash
 # Auto-detect and check workflow
-pipecheck
+pipechecker
 
 # Check specific file
-pipecheck .github/workflows/ci.yml
+pipechecker .github/workflows/ci.yml
 
 # Check all workflows
-pipecheck --all
+pipechecker --all
 
 # Interactive TUI mode
-pipecheck --tui
+pipechecker --tui
 ```
 
 ### All Options
@@ -79,7 +79,7 @@ pipecheck --tui
 ```
 CI/CD Pipeline Auditor - Catch errors before you push
 
-Usage: pipecheck [OPTIONS] [FILE]
+Usage: pipechecker [OPTIONS] [FILE]
 
 Arguments:
   [FILE]  Path to pipeline configuration file (auto-detects if not provided)
@@ -91,7 +91,7 @@ Options:
       --fix              Automatically fix issues where possible
       --tui              Interactive terminal UI mode
   -f, --format <FORMAT>  Output format (text, json) [default: text]
-      --no-docker        Skip Docker image checks
+      --no-pinning         Skip action pinning and Docker image checks
   -s, --strict           Enable strict mode (warnings as errors)
   -h, --help             Print help
   -V, --version          Print version
@@ -101,16 +101,16 @@ Options:
 
 ```bash
 # Install pre-commit hook
-pipecheck --install-hook
+pipechecker --install-hook
 
 # Watch mode - auto-recheck on file changes
-pipecheck --watch
+pipechecker --watch
 
 # Interactive TUI mode
-pipecheck --tui
+pipechecker --tui
 
 # Auto-fix issues (Coming soon!)
-pipecheck --fix
+pipechecker --fix
 ```
 
 ### Configuration File
@@ -118,29 +118,56 @@ pipecheck --fix
 Create `.pipecheckrc.yml` in your project root:
 
 ```yaml
+# Files/patterns to ignore
 ignore:
   - .github/workflows/old-*.yml
-  
+  - .github/workflows/experimental/
+  - .github/workflows/draft-*.yml
+
+# Rule configuration
 rules:
-  circular_dependencies: true
-  missing_secrets: true
-  docker_latest_tag: true
+  circular_dependencies: true  # Check for circular job dependencies
+  missing_secrets: true         # Warn about secrets usage
+  docker_latest_tag: true       # Warn about :latest Docker tags
 ```
+
+### Pre-commit Hook
+
+Pipechecker can install a Git pre-commit hook that automatically validates
+workflow files before every commit:
+
+```bash
+# Install the hook
+pipechecker --install-hook
+```
+
+The hook will:
+1. Detect changed workflow files (`*.yml` in `.github/workflows/`, `.gitlab-ci.yml`, etc.)
+2. Run `pipecheck --all --strict` on them
+3. Block the commit if any errors are found
+
+To skip the check (not recommended):
+```bash
+git commit --no-verify
+```
+
+You can also set up the hook manually by copying `templates/pre-commit-hook.sh`
+to `.git/hooks/pre-commit` and making it executable.
 
 ### Output Formats
 
 ```bash
 # Text output (default)
-pipecheck .github/workflows/ci.yml
+pipechecker .github/workflows/ci.yml
 
 # JSON output for CI integration
-pipecheck .github/workflows/ci.yml --format json
+pipechecker .github/workflows/ci.yml --format json
 
 # Strict mode (warnings as errors)
-pipecheck .github/workflows/ci.yml --strict
+pipechecker .github/workflows/ci.yml --strict
 
-# Skip Docker checks
-pipecheck .github/workflows/ci.yml --no-docker
+# Skip action/Docker checks
+pipechecker .github/workflows/ci.yml --no-pinning
 ```
 
 ## 📋 Example Output
@@ -162,8 +189,8 @@ Provider: GitHubActions
 | Platform | Status | File Pattern |
 |----------|--------|--------------|
 | **GitHub Actions** | ✅ Full Support | `.github/workflows/*.yml` |
-| **GitLab CI** | ✅ Full Support | `.gitlab-ci.yml` |
-| **CircleCI** | ✅ Full Support | `.circleci/config.yml` |
+| **GitLab CI** | 🔜 Coming Soon | `.gitlab-ci.yml` |
+| **CircleCI** | 🔜 Coming Soon | `.circleci/config.yml` |
 
 ## 🏗️ Use in CI/CD
 
@@ -171,22 +198,22 @@ Provider: GitHubActions
 ```yaml
 - name: Validate workflows
   run: |
-    npm install -g pipecheck
-    pipecheck .github/workflows/*.yml --strict
+    npm install -g pipechecker
+    pipechecker .github/workflows/*.yml --strict
 ```
 
 ### GitLab CI
 ```yaml
 validate:
   script:
-    - cargo install pipecheck
-    - pipecheck .gitlab-ci.yml --strict
+    - cargo install pipechecker
+    - pipechecker .gitlab-ci.yml --strict
 ```
 
 ### Pre-commit Hook
 ```bash
 #!/bin/bash
-pipecheck .github/workflows/*.yml --strict || exit 1
+pipechecker .github/workflows/*.yml --strict || exit 1
 ```
 
 ## 🤝 Contributing
@@ -203,4 +230,4 @@ at your option.
 
 ## 🌟 Show Your Support
 
-If Pipecheck saves you time, give it a ⭐ on GitHub!
+If Pipechecker saves you time, give it a ⭐ on GitHub!

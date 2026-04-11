@@ -1,4 +1,16 @@
-use crate::{audit_file, AuditOptions, AuditResult, Severity};
+//! Interactive Terminal UI for pipechecker
+//!
+//! Provides a ratatui-based interface for browsing audit results
+//! across multiple workflow files with keyboard navigation.
+//!
+//! # Keyboard shortcuts
+//! - `↑/↓` or `j/k`: Navigate between files
+//! - `Enter/Space`: Toggle detail view
+//! - `q/Esc`: Quit
+
+use crate::{
+    audit_file, discover_workflows, AuditOptions, AuditResult, DiscoveryOptions, Severity,
+};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
@@ -12,8 +24,9 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Terminal,
 };
-use std::{fs, io, path::Path};
+use std::{io, path::Path};
 
+/// Application state for the TUI
 pub struct App {
     files: Vec<String>,
     results: Vec<Option<AuditResult>>,
@@ -22,27 +35,11 @@ pub struct App {
 }
 
 impl App {
+    /// Create a new TUI application instance
+    ///
+    /// Discovers workflow files and runs initial audits
     pub fn new(options: AuditOptions) -> io::Result<Self> {
-        let mut files = Vec::new();
-
-        if let Ok(entries) = fs::read_dir(".github/workflows") {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("yml")
-                    || path.extension().and_then(|s| s.to_str()) == Some("yaml")
-                {
-                    files.push(path.to_string_lossy().to_string());
-                }
-            }
-        }
-
-        if Path::new(".gitlab-ci.yml").exists() {
-            files.push(".gitlab-ci.yml".to_string());
-        }
-
-        if Path::new(".circleci/config.yml").exists() {
-            files.push(".circleci/config.yml".to_string());
-        }
+        let files = discover_workflows(Path::new("."), &DiscoveryOptions::default());
 
         let mut results = Vec::new();
         for file in &files {
@@ -77,6 +74,10 @@ impl App {
     }
 }
 
+/// Run the interactive TUI mode
+///
+/// Sets up terminal in raw mode with alternate screen,
+/// handles keyboard events, and renders the UI.
 pub fn run_tui(options: AuditOptions) -> io::Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
