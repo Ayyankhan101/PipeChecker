@@ -9,6 +9,7 @@ on:
 env:
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0
+  SCCACHE_VERSION: "0.8.0"
 
 jobs:
   lint:
@@ -20,8 +21,14 @@ jobs:
         with:
           components: clippy
 
-      - name: Install sccache
-        run: cargo install sccache
+      - name: Download sccache
+        run: |
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          curl -L "$SCCACHE_URL" -o sccache.tar.gz
+          tar -xzf sccache.tar.gz
+          mkdir -p $CARGO_HOME/bin/
+          mv sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache $CARGO_HOME/bin/
+          chmod +x $CARGO_HOME/bin/sccache
 
       - name: Cache sccache
         uses: actions/cache@v4
@@ -32,7 +39,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
-        run: sccache --start-server
+        run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -47,7 +54,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Clippy
-        run: RUSTC_WRAPPER=sccache cargo clippy -- -D warnings
+        run: RUSTC_WRAPPER=$CARGO_HOME/bin/sccache cargo clippy -- -D warnings
 
       - name: Formatting check
         run: cargo fmt -- --check
@@ -59,8 +66,14 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install sccache
-        run: cargo install sccache
+      - name: Download sccache
+        run: |
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          curl -L "$SCCACHE_URL" -o sccache.tar.gz
+          tar -xzf sccache.tar.gz
+          mkdir -p $CARGO_HOME/bin/
+          mv sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache $CARGO_HOME/bin/
+          chmod +x $CARGO_HOME/bin/sccache
 
       - name: Cache sccache
         uses: actions/cache@v4
@@ -71,7 +84,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
-        run: sccache --start-server
+        run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -83,6 +96,12 @@ jobs:
           key: security-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             security-cargo-
+
+      - name: Install cargo-audit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/
+          key: cargo-audit
 
       - name: Install cargo-audit
         run: cargo install cargo-audit --force
@@ -99,8 +118,14 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install sccache
-        run: cargo install sccache
+      - name: Download sccache
+        run: |
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          curl -L "$SCCACHE_URL" -o sccache.tar.gz
+          tar -xzf sccache.tar.gz
+          mkdir -p $CARGO_HOME/bin/
+          mv sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache $CARGO_HOME/bin/
+          chmod +x $CARGO_HOME/bin/sccache
 
       - name: Cache sccache
         uses: actions/cache@v4
@@ -111,7 +136,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
-        run: sccache --start-server
+        run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -140,8 +165,14 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Install sccache
-        run: cargo install sccache
+      - name: Download sccache
+        run: |
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          curl -L "$SCCACHE_URL" -o sccache.tar.gz
+          tar -xzf sccache.tar.gz
+          mkdir -p $CARGO_HOME/bin/
+          mv sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache $CARGO_HOME/bin/
+          chmod +x $CARGO_HOME/bin/sccache
 
       - name: Cache sccache
         uses: actions/cache@v4
@@ -152,7 +183,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
-        run: sccache --start-server
+        run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -194,14 +225,19 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            sccache-arch: x86_64-unknown-linux-musl
           - os: macos-latest
             target: x86_64-apple-darwin
+            sccache-arch: x86_64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            sccache-arch: x86_64-pc-windows-msvc
           - os: ubuntu-latest-arm64
             target: aarch64-unknown-linux-gnu
+            sccache-arch: x86_64-unknown-linux-musl
           - os: macos-latest-arm64
             target: aarch64-apple-darwin
+            sccache-arch: x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v4
 
@@ -224,8 +260,14 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install sccache
-        run: cargo install sccache
+      - name: Download sccache
+        run: |
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${matrix.sccache-arch}.tar.gz"
+          curl -L "$SCCACHE_URL" -o sccache.tar.gz
+          tar -xzf sccache.tar.gz
+          mkdir -p $CARGO_HOME/bin/
+          mv sccache-v${SCCACHE_VERSION}-${matrix.sccache-arch}/sccache $CARGO_HOME/bin/
+          chmod +x $CARGO_HOME/bin/sccache
 
       - name: Cache sccache
         uses: actions/cache@v4
@@ -236,7 +278,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
-        run: sccache --start-server
+        run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -259,7 +301,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-
 
       - name: Build
-        run: RUSTC_WRAPPER=sccache cargo build --target ${{ matrix.target }}
+        run: RUSTC_WRAPPER=$CARGO_HOME/bin/sccache cargo build --target ${{ matrix.target }}
 
       - name: Run tests
         run: cargo test --target ${{ matrix.target }}
@@ -279,12 +321,16 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            sccache-arch: x86_64-unknown-linux-musl
           - os: macos-latest
             target: x86_64-apple-darwin
+            sccache-arch: x86_64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            sccache-arch: x86_64-pc-windows-msvc
           - os: macos-latest-arm64
             target: aarch64-apple-darwin
+            sccache-arch: x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v4
 
@@ -292,8 +338,14 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install sccache
-        run: cargo install sccache
+      - name: Download sccache
+        run: |
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${matrix.sccache-arch}.tar.gz"
+          curl -L "$SCCACHE_URL" -o sccache.tar.gz
+          tar -xzf sccache.tar.gz
+          mkdir -p $CARGO_HOME/bin/
+          mv sccache-v${SCCACHE_VERSION}-${matrix.sccache-arch}/sccache $CARGO_HOME/bin/
+          chmod +x $CARGO_HOME/bin/sccache
 
       - name: Cache sccache
         uses: actions/cache@v4
@@ -304,7 +356,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Start sccache server
-        run: sccache --start-server
+        run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -327,7 +379,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-
 
       - name: Build
-        run: RUSTC_WRAPPER=sccache cargo build --target ${{ matrix.target }}
+        run: RUSTC_WRAPPER=$CARGO_HOME/bin/sccache cargo build --target ${{ matrix.target }}
 
       - name: Run tests
         run: cargo test --target ${{ matrix.target }}
