@@ -8,6 +8,7 @@ on:
 
 env:
   RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
 
 jobs:
   lint:
@@ -19,6 +20,16 @@ jobs:
         with:
           components: clippy
 
+      - name: Install sccache
+        run: cargo install sccache
+
+      - name: Start sccache
+        run: |
+          export SCCACHE_GHA_ENABLED=true
+          sccache --start-server
+        env:
+          SCCACHE_GHA_ENABLED: 'true'
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -26,12 +37,13 @@ jobs:
             ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
-          key: lint-cargo-${{ hashFiles('**/Cargo.lock') }}
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            lint-cargo-
+            ${{ runner.os }}-cargo-
 
       - name: Clippy
-        run: cargo clippy -- -D warnings
+        run: RUSTC_WRAPPER=sccache cargo clippy -- -D warnings
 
       - name: Formatting check
         run: cargo fmt -- --check
@@ -42,6 +54,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install sccache
+        run: cargo install sccache
+
+      - name: Start sccache
+        run: |
+          sccache --start-server
+        env:
+          SCCACHE_GHA_ENABLED: 'true'
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -69,6 +90,15 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Install sccache
+        run: cargo install sccache
+
+      - name: Start sccache
+        run: |
+          sccache --start-server
+        env:
+          SCCACHE_GHA_ENABLED: 'true'
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -95,6 +125,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
+
+      - name: Install sccache
+        run: cargo install sccache
+
+      - name: Start sccache
+        run: |
+          sccache --start-server
+        env:
+          SCCACHE_GHA_ENABLED: 'true'
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -129,6 +168,7 @@ jobs:
   test:
     needs: [lint, security, docs]
     runs-on: ${{ matrix.os }}
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -165,6 +205,15 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Install sccache
+        run: cargo install sccache
+
+      - name: Start sccache
+        run: |
+          sccache --start-server
+        env:
+          SCCACHE_GHA_ENABLED: 'true'
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -186,10 +235,73 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-
 
       - name: Build
-        run: cargo build --verbose --target ${{ matrix.target }}
+        run: RUSTC_WRAPPER=sccache cargo build --target ${{ matrix.target }}
 
       - name: Run tests
-        run: cargo test --verbose --target ${{ matrix.target }}
+        run: cargo test --target ${{ matrix.target }}
+
+      - name: Test CLI
+        run: |
+          cargo run -- -- tests/fixtures/github/valid.yml
+          cargo run -- tests/fixtures/github/circular.yml || true
+
+  test-pr:
+    needs: [lint, security, docs]
+    runs-on: ${{ matrix.os }}
+    if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest-arm64
+            target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install sccache
+        run: cargo install sccache
+
+      - name: Start sccache
+        run: |
+          sccache --start-server
+        env:
+          SCCACHE_GHA_ENABLED: 'true'
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-
+
+      - name: Build
+        run: RUSTC_WRAPPER=sccache cargo build --target ${{ matrix.target }}
+
+      - name: Run tests
+        run: cargo test --target ${{ matrix.target }}
 
       - name: Test CLI
         run: |
