@@ -9,7 +9,6 @@ on:
 env:
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0
-  SCCACHE_VERSION: "0.8.0"
 
 jobs:
   lint:
@@ -23,6 +22,7 @@ jobs:
 
       - name: Download sccache
         run: |
+          SCCACHE_VERSION=0.8.0
           SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
           curl -L "$SCCACHE_URL" -o sccache.tar.gz
           tar -xzf sccache.tar.gz
@@ -68,6 +68,7 @@ jobs:
 
       - name: Download sccache
         run: |
+          SCCACHE_VERSION=0.8.0
           SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
           curl -L "$SCCACHE_URL" -o sccache.tar.gz
           tar -xzf sccache.tar.gz
@@ -120,6 +121,7 @@ jobs:
 
       - name: Download sccache
         run: |
+          SCCACHE_VERSION=0.8.0
           SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
           curl -L "$SCCACHE_URL" -o sccache.tar.gz
           tar -xzf sccache.tar.gz
@@ -167,6 +169,7 @@ jobs:
 
       - name: Download sccache
         run: |
+          SCCACHE_VERSION=0.8.0
           SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
           curl -L "$SCCACHE_URL" -o sccache.tar.gz
           tar -xzf sccache.tar.gz
@@ -262,6 +265,7 @@ jobs:
 
       - name: Download sccache
         run: |
+          SCCACHE_VERSION=0.8.0
           SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${matrix.sccache-arch}.tar.gz"
           curl -L "$SCCACHE_URL" -o sccache.tar.gz
           tar -xzf sccache.tar.gz
@@ -340,6 +344,7 @@ jobs:
 
       - name: Download sccache
         run: |
+          SCCACHE_VERSION=0.8.0
           SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${matrix.sccache-arch}.tar.gz"
           curl -L "$SCCACHE_URL" -o sccache.tar.gz
           tar -xzf sccache.tar.gz
