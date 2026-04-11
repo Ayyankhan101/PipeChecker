@@ -52,3 +52,8 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# AI Agents
+agent/
+agents/
+.qwen/
