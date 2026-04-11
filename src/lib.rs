@@ -10,7 +10,7 @@
 //!
 //! ## Example
 //! ```no_run
-//! use pipecheck::{audit_file, AuditOptions};
+//! use pipechecker::{audit_file, AuditOptions};
 //!
 //! let results = audit_file(".github/workflows/ci.yml", AuditOptions::default())?;
 //! for issue in results.issues {
