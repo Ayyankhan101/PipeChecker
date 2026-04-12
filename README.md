@@ -30,6 +30,7 @@ Every developer has been here:
 | ⚠️ **Undeclared env vars** | `${{ env.UNKNOWN }}` never defined |
 | ⚠️ **Unpinned actions** | `uses: actions/checkout` without `@v4` |
 | ⚠️ **Docker `:latest` tags** | `image: nginx:latest` (unreproducible builds) |
+| ⚠️ **Missing job timeouts** | No `timeout-minutes` set — jobs can run forever |
 
 ---
 
@@ -180,10 +181,12 @@ pipechecker --tui
 | `--all`, `-a` | Audit **all** discovered workflow files |
 | `--tui` | Launch the interactive terminal UI |
 | `--watch`, `-w` | Watch for file changes and re-run audits |
-| `--fix` | Auto-fix issues (pin unpinned actions) |
+| `--fix` | Auto-fix issues (pin unpinned actions + Docker `:latest` tags) |
 | `--install-hook` | Install a git pre-commit hook |
 | `--format`, `-f` `<text\|json>` | Output format (default: `text`) |
 | `--strict`, `-s` | Treat warnings as errors (exit code 1) |
+| `--quiet`, `-q` | Only output errors — suppress warnings and info. Perfect for CI |
+| `--verbose` | Show diagnostic info (auditors ran, per-severity counts, discovered files) |
 | `--no-pinning` | Skip Docker image and action-pinning checks |
 | `--version` | Show version |
 | `--help` | Show help |
@@ -283,6 +286,49 @@ pipechecker --watch
 Provider: GitHubActions
 0 errors, 0 warnings
 ✅ All checks passed
+```
+
+### 🤫 Quiet Mode (CI-Friendly)
+Only output errors — suppress warnings and info. Perfect for CI pipelines where you want clean output:
+
+```bash
+pipechecker --quiet
+# or
+pipechecker -q
+```
+
+```
+❌ Circular dependency detected (job: deploy) (in .github/workflows/deploy.yml)
+```
+
+Exit code is still `1` if there are errors — works perfectly with `--strict` for failing CI on any issue.
+
+### 📢 Verbose Mode
+See exactly what PipeChecker is doing — which files it found, which auditors ran, and per-severity breakdowns:
+
+```bash
+pipechecker --verbose
+```
+
+```
+📄 Auditing: .github/workflows/ci.yml
+🔍 Auditors ran: syntax, dag, secrets, pinning
+📊 Found: 0 errors, 1 warnings, 0 info
+⏱️  Checked in 3.2ms
+```
+
+### ⏱️ Timing Metrics
+Every audit now shows how long it took — because speed matters:
+
+```bash
+pipechecker .github/workflows/ci.yml
+```
+
+```
+Provider: GitHubActions
+0 errors, 0 warnings
+✅ All checks passed
+⏱️  Checked in 2.1ms
 ```
 
 ### 🔒 Pre-commit Hook
