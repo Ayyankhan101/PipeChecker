@@ -162,15 +162,15 @@ jobs:
           if [ -z "$REPORT" ]; then
             echo "No coverage report found" >> $GITHUB_STEP_SUMMARY
           else
-            python3 -c "
-import json
-with open('$REPORT') as f:
-    d = json.load(f)
-covered = d.get('covered', 0)
-coverable = d.get('coverable', 1)
-pct = covered / coverable * 100
-print(f'**Coverage: {pct:.1f}%** ({covered}/{coverable} lines)')
-" >> $GITHUB_STEP_SUMMARY || echo "Failed to parse coverage report" >> $GITHUB_STEP_SUMMARY
+            python3 - "$REPORT" <<'PYEOF' >> $GITHUB_STEP_SUMMARY || echo "Failed to parse coverage report" >> $GITHUB_STEP_SUMMARY
+          import json, sys
+          with open(sys.argv[1]) as f:
+              d = json.load(f)
+          covered = d.get('covered', 0)
+          coverable = d.get('coverable', 1)
+          pct = covered / coverable * 100
+          print(f'**Coverage: {pct:.1f}%** ({covered}/{coverable} lines)')
+          PYEOF
           fi
 
   # Full matrix — push to main only
