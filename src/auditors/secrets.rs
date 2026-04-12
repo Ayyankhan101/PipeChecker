@@ -287,7 +287,9 @@ mod tests {
         // Secret references are the correct way, not hardcoded
         assert!(!is_potential_secret_value("${{ secrets.API_KEY }}"));
         assert!(!is_potential_secret_value("${{secrets.TOKEN}}"));
-        assert!(!is_potential_secret_value("use ${{ secrets.MY_SECRET }} here"));
+        assert!(!is_potential_secret_value(
+            "use ${{ secrets.MY_SECRET }} here"
+        ));
     }
 
     #[test]
@@ -318,15 +320,11 @@ mod tests {
     #[test]
     fn test_long_alphanumeric_detected_as_secret() {
         // Strings longer than 20 chars that are all alphanumeric/underscore/dash
-        assert!(is_potential_secret_value(
-            "aB3dEf6hIjKlMnOpQrStUvWx"
-        ));
+        assert!(is_potential_secret_value("aB3dEf6hIjKlMnOpQrStUvWx"));
         assert!(is_potential_secret_value(
             "my_long_key_value_123456789012345"
         ));
-        assert!(is_potential_secret_value(
-            "ghp_ABCDEFGHIJKLMNOPQRSTUVWXyz"
-        ));
+        assert!(is_potential_secret_value("ghp_ABCDEFGHIJKLMNOPQRSTUVWXyz"));
     }
 
     #[test]
@@ -344,7 +342,9 @@ mod tests {
         assert!(is_potential_secret_value(
             "SGVsbG8gV29ybGQhIFRoaXMgaXMgYSBsb25nIGVuY29kZWQgc3RyaW5n"
         ));
-        assert!(is_potential_secret_value("abcDEF123+/xyzABC456===GHJklmno789pqrSTUV"));
+        assert!(is_potential_secret_value(
+            "abcDEF123+/xyzABC456===GHJklmno789pqrSTUV"
+        ));
     }
 
     #[test]
@@ -363,7 +363,9 @@ mod tests {
     #[test]
     fn test_values_with_special_chars_not_long_enough() {
         // Contains spaces, so not all alphanumeric
-        assert!(!is_potential_secret_value("hello world this is a test string"));
+        assert!(!is_potential_secret_value(
+            "hello world this is a test string"
+        ));
     }
 
     #[test]

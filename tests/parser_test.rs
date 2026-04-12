@@ -284,7 +284,10 @@ jobs:
 
     let pipeline = parse(yaml, Provider::GitHubActions).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
-    assert_eq!(build_job.container_image, Some("node:18-alpine".to_string()));
+    assert_eq!(
+        build_job.container_image,
+        Some("node:18-alpine".to_string())
+    );
 }
 
 #[test]
@@ -334,7 +337,9 @@ jobs:
     let pipeline = parse(yaml, Provider::GitHubActions).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
     assert_eq!(build_job.service_images.len(), 2);
-    assert!(build_job.service_images.contains(&"postgres:15".to_string()));
+    assert!(build_job
+        .service_images
+        .contains(&"postgres:15".to_string()));
     assert!(build_job
         .service_images
         .contains(&"redis:7-alpine".to_string()));
@@ -420,7 +425,10 @@ deploy:
 
     let pipeline = parse(yaml, Provider::GitLabCI).unwrap();
     let deploy_job = &pipeline.jobs[0];
-    let trigger_step = deploy_job.steps.iter().find(|s| s.name.as_deref() == Some("trigger"));
+    let trigger_step = deploy_job
+        .steps
+        .iter()
+        .find(|s| s.name.as_deref() == Some("trigger"));
     assert!(trigger_step.is_some());
 }
 
@@ -475,7 +483,9 @@ build:
         Some("gcr.io/distroless/base".to_string())
     );
     assert_eq!(build_job.service_images.len(), 2);
-    assert!(build_job.service_images.contains(&"postgres:15".to_string()));
+    assert!(build_job
+        .service_images
+        .contains(&"postgres:15".to_string()));
     assert!(build_job.service_images.contains(&"redis:7".to_string()));
 }
 
@@ -497,9 +507,18 @@ test:
 
     let pipeline = parse(yaml, Provider::GitLabCI).unwrap();
     let test_job = &pipeline.jobs[0];
-    assert!(test_job.steps.iter().any(|s| s.name.as_deref() == Some("before_script")));
-    assert!(test_job.steps.iter().any(|s| s.name.as_deref() == Some("script")));
-    assert!(test_job.steps.iter().any(|s| s.name.as_deref() == Some("after_script")));
+    assert!(test_job
+        .steps
+        .iter()
+        .any(|s| s.name.as_deref() == Some("before_script")));
+    assert!(test_job
+        .steps
+        .iter()
+        .any(|s| s.name.as_deref() == Some("script")));
+    assert!(test_job
+        .steps
+        .iter()
+        .any(|s| s.name.as_deref() == Some("after_script")));
 }
 
 #[test]
