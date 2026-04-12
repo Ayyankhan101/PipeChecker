@@ -165,3 +165,321 @@ pub struct EnvVar {
     pub value: String,
     pub is_secret: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- Issue constructor tests ---
+
+    #[test]
+    fn test_issue_new_without_location() {
+        let issue = Issue::new(
+            Severity::Error,
+            "something broke",
+            Some("fix it".to_string()),
+        );
+
+        assert_eq!(issue.severity, Severity::Error);
+        assert_eq!(issue.message, "something broke");
+        assert!(issue.location.is_none());
+        assert_eq!(issue.suggestion, Some("fix it".to_string()));
+    }
+
+    #[test]
+    fn test_issue_new_no_suggestion() {
+        let issue = Issue::new(Severity::Warning, "watch out", None);
+
+        assert_eq!(issue.severity, Severity::Warning);
+        assert!(issue.suggestion.is_none());
+        assert!(issue.location.is_none());
+    }
+
+    #[test]
+    fn test_issue_for_job() {
+        let issue = Issue::for_job(
+            Severity::Error,
+            "cycle detected",
+            "build",
+            10,
+            3,
+            Some("break the cycle".to_string()),
+        );
+
+        assert_eq!(issue.severity, Severity::Error);
+        assert_eq!(issue.message, "cycle detected");
+        assert!(issue.location.is_some());
+        let loc = issue.location.as_ref().unwrap();
+        assert_eq!(loc.line, 10);
+        assert_eq!(loc.column, 3);
+        assert_eq!(loc.job, Some("build".to_string()));
+        assert_eq!(issue.suggestion, Some("break the cycle".to_string()));
+    }
+
+    #[test]
+    fn test_issue_for_job_no_suggestion() {
+        let issue = Issue::for_job(Severity::Warning, "missing step", "test", 5, 1, None);
+
+        assert_eq!(issue.message, "missing step");
+        assert!(issue.suggestion.is_none());
+        assert!(issue.location.is_some());
+    }
+
+    // --- Location tests ---
+
+    #[test]
+    fn test_location_default() {
+        let loc = Location::default();
+        assert_eq!(loc.line, 0);
+        assert_eq!(loc.column, 0);
+        assert!(loc.job.is_none());
+    }
+
+    // --- Issue with full location ---
+
+    #[test]
+    fn test_issue_with_explicit_location() {
+        let issue = Issue {
+            severity: Severity::Info,
+            message: "info message".to_string(),
+            location: Some(Location {
+                line: 42,
+                column: 7,
+                job: Some("deploy".to_string()),
+            }),
+            suggestion: None,
+        };
+
+        assert_eq!(issue.location.as_ref().unwrap().line, 42);
+        assert_eq!(issue.location.as_ref().unwrap().column, 7);
+    }
+
+    // --- Pipeline::find_line tests ---
+
+    #[test]
+    fn test_pipeline_find_line_basic() {
+        let source = "name: CI\njobs:\n  build:\n    runs-on: ubuntu";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![],
+            env: vec![],
+            source: source.to_string(),
+        };
+
+        let (line, col) = pipeline.find_line("jobs:");
+        assert_eq!(line, 2);
+        assert_eq!(col, 1);
+    }
+
+    #[test]
+    fn test_pipeline_find_line_indented() {
+        let source = "name: CI\njobs:\n  build:\n    runs-on: ubuntu";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![],
+            env: vec![],
+            source: source.to_string(),
+        };
+
+        let (line, col) = pipeline.find_line("runs-on:");
+        assert_eq!(line, 4);
+        assert_eq!(col, 5);
+    }
+
+    #[test]
+    fn test_pipeline_find_line_not_found() {
+        let source = "name: CI\non: push";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![],
+            env: vec![],
+            source: source.to_string(),
+        };
+
+        let (line, col) = pipeline.find_line("missing:");
+        assert_eq!(line, 0);
+        assert_eq!(col, 0);
+    }
+
+    // --- Pipeline::find_job_line tests ---
+
+    #[test]
+    fn test_pipeline_find_job_line_returns_job_header() {
+        // find_job_line first looks for "job_id:" and returns that line
+        let source = "jobs:\n  build:\n    runs-on: ubuntu\n    steps:";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![],
+            env: vec![],
+            source: source.to_string(),
+        };
+
+        let (line, col) = pipeline.find_job_line("build", "runs-on");
+        // Returns the job definition line (build:), not the hint line
+        assert_eq!(line, 2);
+        assert_eq!(col, 3);
+    }
+
+    #[test]
+    fn test_pipeline_find_job_line_similar_prefix_skipped() {
+        // "build-extra:" should not match when searching for "build:"
+        // But the key_hint "runs-on:" is found on line 3
+        let source = "jobs:\n  build-extra:\n    runs-on: ubuntu\n  build:\n    runs-on: ubuntu";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![],
+            env: vec![],
+            source: source.to_string(),
+        };
+
+        let (line, _col) = pipeline.find_job_line("build", "runs-on");
+        // "build-extra:" doesn't match, but "runs-on:" is found on line 3
+        // (key_hint search is independent, not scoped to the job block)
+        assert_eq!(line, 3);
+    }
+
+    #[test]
+    fn test_pipeline_find_job_line_no_job_match_falls_back_to_hint() {
+        // When job_id isn't found, key_hint may still match elsewhere
+        let source = "jobs:\n  build:\n    runs-on: ubuntu";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![],
+            env: vec![],
+            source: source.to_string(),
+        };
+
+        let (line, _col) = pipeline.find_job_line("deploy", "runs-on");
+        // key_hint "runs-on:" is still found
+        assert_eq!(line, 3);
+    }
+
+    #[test]
+    fn test_pipeline_find_job_line_not_found_at_all() {
+        let source = "jobs:\n  build:\n    runs-on: ubuntu";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![],
+            env: vec![],
+            source: source.to_string(),
+        };
+
+        let (line, col) = pipeline.find_job_line("deploy", "steps");
+        assert_eq!(line, 0);
+        assert_eq!(col, 0);
+    }
+
+    // --- Severity equality tests ---
+
+    #[test]
+    fn test_severity_equality() {
+        assert_eq!(Severity::Error, Severity::Error);
+        assert_ne!(Severity::Error, Severity::Warning);
+        assert_ne!(Severity::Warning, Severity::Info);
+    }
+
+    #[test]
+    fn test_severity_clone() {
+        let s = Severity::Error;
+        assert_eq!(s.clone(), Severity::Error);
+    }
+
+    // --- EnvVar tests ---
+
+    #[test]
+    fn test_env_var_creation() {
+        let env = EnvVar {
+            key: "API_KEY".to_string(),
+            value: "secret123".to_string(),
+            is_secret: true,
+        };
+
+        assert_eq!(env.key, "API_KEY");
+        assert_eq!(env.value, "secret123");
+        assert!(env.is_secret);
+    }
+
+    // --- Step tests ---
+
+    #[test]
+    fn test_step_with_all_fields() {
+        let step = Step {
+            name: Some("Build".to_string()),
+            uses: Some("actions/checkout@v4".to_string()),
+            run: None,
+            env: vec![],
+            with_inputs: None,
+        };
+
+        assert_eq!(step.name, Some("Build".to_string()));
+        assert_eq!(step.uses, Some("actions/checkout@v4".to_string()));
+        assert!(step.run.is_none());
+    }
+
+    #[test]
+    fn test_step_with_run_command() {
+        let step = Step {
+            name: Some("Test".to_string()),
+            uses: None,
+            run: Some("cargo test".to_string()),
+            env: vec![EnvVar {
+                key: "RUST_BACKTRACE".to_string(),
+                value: "1".to_string(),
+                is_secret: false,
+            }],
+            with_inputs: None,
+        };
+
+        assert_eq!(step.run, Some("cargo test".to_string()));
+        assert_eq!(step.env.len(), 1);
+    }
+
+    // --- Job tests ---
+
+    #[test]
+    fn test_job_with_dependencies() {
+        let job = Job {
+            id: "deploy".to_string(),
+            name: Some("Deploy".to_string()),
+            depends_on: vec!["build".to_string(), "test".to_string()],
+            steps: vec![],
+            env: vec![],
+            container_image: None,
+            service_images: vec![],
+        };
+
+        assert_eq!(job.depends_on.len(), 2);
+        assert!(job.depends_on.contains(&"build".to_string()));
+        assert!(job.depends_on.contains(&"test".to_string()));
+    }
+
+    #[test]
+    fn test_job_with_container_and_services() {
+        let job = Job {
+            id: "ci".to_string(),
+            name: None,
+            depends_on: vec![],
+            steps: vec![],
+            env: vec![],
+            container_image: Some("node:18".to_string()),
+            service_images: vec!["postgres:15".to_string(), "redis:7".to_string()],
+        };
+
+        assert_eq!(job.container_image, Some("node:18".to_string()));
+        assert_eq!(job.service_images.len(), 2);
+    }
+
+    // --- Provider tests ---
+
+    #[test]
+    fn test_provider_clone() {
+        let p = Provider::GitHubActions;
+        assert_eq!(p.clone(), Provider::GitHubActions);
+    }
+
+    #[test]
+    fn test_provider_equality() {
+        assert_eq!(Provider::GitLabCI, Provider::GitLabCI);
+        assert_ne!(Provider::GitHubActions, Provider::CircleCI);
+    }
+}

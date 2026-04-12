@@ -188,3 +188,246 @@ pub fn find_line_with_prefix(content: &str, key_prefix: &str, search: &str) -> (
     }
     (0, 0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{self, File};
+    use std::io::Write;
+
+    // --- discover_workflows tests ---
+
+    #[test]
+    fn test_discover_workflows_github_only() {
+        let dir = std::env::temp_dir().join("pipechecker_test_github_only");
+        let _ = fs::remove_dir_all(&dir);
+        let wf_dir = dir.join(".github/workflows");
+        fs::create_dir_all(&wf_dir).unwrap();
+        File::create(wf_dir.join("ci.yml")).unwrap();
+        File::create(wf_dir.join("deploy.yaml")).unwrap();
+
+        let opts = DiscoveryOptions {
+            include_github: true,
+            include_gitlab: false,
+            include_circleci: false,
+        };
+        let files = discover_workflows(&dir, &opts);
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().any(|f| f.contains("ci.yml")));
+        assert!(files.iter().any(|f| f.contains("deploy.yaml")));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_discover_workflows_nonexistent_directory() {
+        let dir = std::env::temp_dir().join("pipechecker_nonexistent_dir_xyz");
+        // Don't create the directory
+        let files = discover_workflows(&dir, &DiscoveryOptions::default());
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn test_discover_workflows_filters_extensions() {
+        let dir = std::env::temp_dir().join("pipechecker_test_ext_filter");
+        let _ = fs::remove_dir_all(&dir);
+        let wf_dir = dir.join(".github/workflows");
+        fs::create_dir_all(&wf_dir).unwrap();
+        File::create(wf_dir.join("good.yml")).unwrap();
+        File::create(wf_dir.join("bad.txt")).unwrap();
+        File::create(wf_dir.join("skip.toml")).unwrap();
+
+        let opts = DiscoveryOptions {
+            include_github: true,
+            include_gitlab: false,
+            include_circleci: false,
+        };
+        let files = discover_workflows(&dir, &opts);
+        assert_eq!(files.len(), 1);
+        assert!(files[0].contains("good.yml"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_discover_workflows_gitlab_file() {
+        let dir = std::env::temp_dir().join("pipechecker_test_gitlab");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let mut f = File::create(dir.join(".gitlab-ci.yml")).unwrap();
+        f.write_all(b"stages:\n  - build\n").unwrap();
+
+        let opts = DiscoveryOptions {
+            include_github: false,
+            include_gitlab: true,
+            include_circleci: false,
+        };
+        let files = discover_workflows(&dir, &opts);
+        assert_eq!(files.len(), 1);
+        assert!(files[0].contains(".gitlab-ci.yml"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_discover_workflows_circleci_file() {
+        let dir = std::env::temp_dir().join("pipechecker_test_circleci");
+        let _ = fs::remove_dir_all(&dir);
+        let cc_dir = dir.join(".circleci");
+        fs::create_dir_all(&cc_dir).unwrap();
+        File::create(cc_dir.join("config.yml")).unwrap();
+
+        let opts = DiscoveryOptions {
+            include_github: false,
+            include_gitlab: false,
+            include_circleci: true,
+        };
+        let files = discover_workflows(&dir, &opts);
+        assert_eq!(files.len(), 1);
+        assert!(files[0].contains("config.yml"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_discover_workflows_all_disabled() {
+        let dir = std::env::temp_dir().join("pipechecker_test_disabled");
+        let _ = fs::remove_dir_all(&dir);
+        let wf_dir = dir.join(".github/workflows");
+        fs::create_dir_all(&wf_dir).unwrap();
+        File::create(wf_dir.join("ci.yml")).unwrap();
+
+        let opts = DiscoveryOptions {
+            include_github: false,
+            include_gitlab: false,
+            include_circleci: false,
+        };
+        let files = discover_workflows(&dir, &opts);
+        assert!(files.is_empty());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // --- find_line tests ---
+
+    #[test]
+    fn test_find_line_basic() {
+        let content = "name: CI\non: push\njobs:\n  build:";
+        let (line, col) = find_line(content, "jobs:");
+        assert_eq!(line, 3);
+        assert_eq!(col, 1);
+    }
+
+    #[test]
+    fn test_find_line_indented() {
+        let content = "name: CI\njobs:\n  build:\n    runs-on: ubuntu";
+        let (line, col) = find_line(content, "runs-on:");
+        assert_eq!(line, 4);
+        assert_eq!(col, 5);
+    }
+
+    #[test]
+    fn test_find_line_not_found() {
+        let content = "name: CI\non: push";
+        let (line, col) = find_line(content, "missing:");
+        assert_eq!(line, 0);
+        assert_eq!(col, 0);
+    }
+
+    #[test]
+    fn test_find_line_empty_content() {
+        let (line, col) = find_line("", "anything:");
+        assert_eq!(line, 0);
+        assert_eq!(col, 0);
+    }
+
+    #[test]
+    fn test_find_line_first_match() {
+        let content = "name: CI\nname: Duplicate\n";
+        let (line, col) = find_line(content, "name:");
+        assert_eq!(line, 1); // returns first match
+        assert_eq!(col, 1);
+    }
+
+    // --- find_line_with_prefix tests ---
+
+    #[test]
+    fn test_find_line_with_prefix_both_match() {
+        let content = "jobs:\n  build:\n    name: Build Step";
+        let (line, _col) = find_line_with_prefix(content, "name:", "Build");
+        assert_eq!(line, 3);
+    }
+
+    #[test]
+    fn test_find_line_with_prefix_no_match() {
+        let content = "jobs:\n  build:\n    name: Build";
+        let (line, col) = find_line_with_prefix(content, "name:", "Deploy");
+        assert_eq!(line, 0);
+        assert_eq!(col, 0);
+    }
+
+    #[test]
+    fn test_find_line_with_prefix_indented() {
+        let content = "jobs:\n  test:\n    container:\n      image: node:18";
+        let (line, _col) = find_line_with_prefix(content, "image:", "node");
+        assert_eq!(line, 4);
+    }
+
+    #[test]
+    fn test_find_line_with_prefix_partial_match() {
+        let content = "services:\n  db:\n    image: postgres:15";
+        let (line, _col) = find_line_with_prefix(content, "image:", "postgres");
+        assert_eq!(line, 3);
+    }
+
+    // --- generate_summary tests ---
+
+    #[test]
+    fn test_generate_summary_zero_issues() {
+        let issues = vec![];
+        let summary = generate_summary(&issues);
+        assert_eq!(summary, "0 errors, 0 warnings");
+    }
+
+    #[test]
+    fn test_generate_summary_errors_only() {
+        let issues = vec![
+            Issue::new(Severity::Error, "error 1", None),
+            Issue::new(Severity::Error, "error 2", None),
+            Issue::new(Severity::Error, "error 3", None),
+        ];
+        let summary = generate_summary(&issues);
+        assert_eq!(summary, "3 errors, 0 warnings");
+    }
+
+    #[test]
+    fn test_generate_summary_warnings_only() {
+        let issues = vec![
+            Issue::new(Severity::Warning, "warn 1", None),
+            Issue::new(Severity::Warning, "warn 2", None),
+        ];
+        let summary = generate_summary(&issues);
+        assert_eq!(summary, "0 errors, 2 warnings");
+    }
+
+    #[test]
+    fn test_generate_summary_mixed() {
+        let issues = vec![
+            Issue::new(Severity::Error, "error", None),
+            Issue::new(Severity::Warning, "warn 1", None),
+            Issue::new(Severity::Warning, "warn 2", None),
+            Issue::new(Severity::Info, "info", None),
+        ];
+        let summary = generate_summary(&issues);
+        assert_eq!(summary, "1 errors, 2 warnings");
+    }
+
+    // --- AuditOptions tests ---
+
+    #[test]
+    fn test_audit_options_defaults() {
+        let opts = AuditOptions::default();
+        assert!(opts.check_docker_images);
+        assert!(!opts.strict_mode);
+    }
+}

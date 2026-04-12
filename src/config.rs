@@ -94,3 +94,118 @@ impl Config {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- should_ignore tests ---
+
+    #[test]
+    fn test_should_ignore_empty_config() {
+        let config = Config::default();
+        assert!(!config.should_ignore(".github/workflows/ci.yml"));
+        assert!(!config.should_ignore("any/path.yml"));
+    }
+
+    #[test]
+    fn test_should_ignore_exact_match() {
+        let config = Config {
+            ignore: vec![".github/workflows/old.yml".to_string()],
+            rules: Rules::default(),
+        };
+        assert!(config.should_ignore(".github/workflows/old.yml"));
+        assert!(!config.should_ignore(".github/workflows/new.yml"));
+    }
+
+    #[test]
+    fn test_should_ignore_contains_match() {
+        let config = Config {
+            ignore: vec!["old".to_string()],
+            rules: Rules::default(),
+        };
+        assert!(config.should_ignore(".github/workflows/old-test.yml"));
+        assert!(config.should_ignore("old-deploy.yml"));
+        assert!(!config.should_ignore(".github/workflows/new.yml"));
+    }
+
+    #[test]
+    fn test_should_ignore_wildcard_github_style() {
+        let config = Config {
+            ignore: vec!["*.yml".to_string()],
+            rules: Rules::default(),
+        };
+        assert!(config.should_ignore("ci.yml"));
+        assert!(config.should_ignore(".github/workflows/deploy.yml"));
+        assert!(!config.should_ignore("script.sh"));
+    }
+
+    #[test]
+    fn test_should_ignore_wildcard_path_pattern() {
+        let config = Config {
+            ignore: vec![".*test.*".to_string()],
+            rules: Rules::default(),
+        };
+        assert!(config.should_ignore(".github/workflows/test-ci.yml"));
+        assert!(config.should_ignore("my-test-file.yml"));
+        assert!(!config.should_ignore(".github/workflows/ci.yml"));
+    }
+
+    #[test]
+    fn test_should_ignore_multiple_patterns() {
+        let config = Config {
+            ignore: vec![
+                "old".to_string(),
+                "*.bak.yml".to_string(),
+                "temp".to_string(),
+            ],
+            rules: Rules::default(),
+        };
+        assert!(config.should_ignore("old-pipeline.yml"));
+        assert!(config.should_ignore("backup.bak.yml"));
+        assert!(config.should_ignore("temp-deploy.yml"));
+        assert!(!config.should_ignore("production.yml"));
+    }
+
+    #[test]
+    fn test_should_ignore_wildcard_complex_path() {
+        let config = Config {
+            ignore: vec![".github/workflows/*draft*".to_string()],
+            rules: Rules::default(),
+        };
+        assert!(config.should_ignore(".github/workflows/draft-pr.yml"));
+        assert!(config.should_ignore(".github/workflows/my-draft-pipeline.yml"));
+        assert!(!config.should_ignore(".github/workflows/ci.yml"));
+    }
+
+    #[test]
+    fn test_should_ignore_invalid_regex() {
+        // Invalid regex pattern should return false (not panic)
+        let config = Config {
+            ignore: vec!["[invalid".to_string()],
+            rules: Rules::default(),
+        };
+        assert!(!config.should_ignore("any-file.yml"));
+    }
+
+    // --- Rules defaults ---
+
+    #[test]
+    fn test_rules_default_values() {
+        let rules = Rules::default();
+        assert!(rules.circular_dependencies);
+        assert!(rules.missing_secrets);
+        assert!(rules.docker_latest_tag);
+    }
+
+    // --- Config default ---
+
+    #[test]
+    fn test_config_default() {
+        let config = Config::default();
+        assert!(config.ignore.is_empty());
+        assert!(config.rules.circular_dependencies);
+        assert!(config.rules.missing_secrets);
+        assert!(config.rules.docker_latest_tag);
+    }
+}

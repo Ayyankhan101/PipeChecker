@@ -275,3 +275,99 @@ fn is_potential_secret_value(value: &str) -> bool {
 
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- is_potential_secret_value tests ---
+
+    #[test]
+    fn test_secret_reference_is_not_secret() {
+        // Secret references are the correct way, not hardcoded
+        assert!(!is_potential_secret_value("${{ secrets.API_KEY }}"));
+        assert!(!is_potential_secret_value("${{secrets.TOKEN}}"));
+        assert!(!is_potential_secret_value("use ${{ secrets.MY_SECRET }} here"));
+    }
+
+    #[test]
+    fn test_keyword_patterns_detected() {
+        assert!(is_potential_secret_value("api_key=abc123"));
+        assert!(is_potential_secret_value("APIKEY=mykey"));
+        assert!(is_potential_secret_value("api-secret=test"));
+        assert!(is_potential_secret_value("secret_key=xyz"));
+        assert!(is_potential_secret_value("secretkey=123"));
+        assert!(is_potential_secret_value("access_key=abc"));
+        assert!(is_potential_secret_value("auth_token=tok123"));
+        assert!(is_potential_secret_value("authtoken=tok"));
+        assert!(is_potential_secret_value("private_key=pk123"));
+        assert!(is_potential_secret_value("privatekey=pk"));
+        assert!(is_potential_secret_value("password=hunter2"));
+        assert!(is_potential_secret_value("passwd=pass"));
+        assert!(is_potential_secret_value("token=abc123"));
+    }
+
+    #[test]
+    fn test_keyword_case_insensitive() {
+        assert!(is_potential_secret_value("API_KEY=abc"));
+        assert!(is_potential_secret_value("Password=123"));
+        assert!(is_potential_secret_value("AUTH_TOKEN=xyz"));
+        assert!(is_potential_secret_value("SECRET-KEY=val"));
+    }
+
+    #[test]
+    fn test_long_alphanumeric_detected_as_secret() {
+        // Strings longer than 20 chars that are all alphanumeric/underscore/dash
+        assert!(is_potential_secret_value(
+            "aB3dEf6hIjKlMnOpQrStUvWx"
+        ));
+        assert!(is_potential_secret_value(
+            "my_long_key_value_123456789012345"
+        ));
+        assert!(is_potential_secret_value(
+            "ghp_ABCDEFGHIJKLMNOPQRSTUVWXyz"
+        ));
+    }
+
+    #[test]
+    fn test_short_alphanumeric_not_secret() {
+        // Short strings should not be flagged
+        assert!(!is_potential_secret_value("hello"));
+        assert!(!is_potential_secret_value("ubuntu-latest"));
+        assert!(!is_potential_secret_value("node:18"));
+        assert!(!is_potential_secret_value("cargo test"));
+    }
+
+    #[test]
+    fn test_base64_like_detected() {
+        // Long base64-like strings (40+ chars with base64 alphabet)
+        assert!(is_potential_secret_value(
+            "SGVsbG8gV29ybGQhIFRoaXMgaXMgYSBsb25nIGVuY29kZWQgc3RyaW5n"
+        ));
+        assert!(is_potential_secret_value("abcDEF123+/xyzABC456===GHJklmno789pqrSTUV"));
+    }
+
+    #[test]
+    fn test_normal_values_not_flagged() {
+        assert!(!is_potential_secret_value("true"));
+        assert!(!is_potential_secret_value("false"));
+        assert!(!is_potential_secret_value("ubuntu-latest"));
+        assert!(!is_potential_secret_value("node:18-alpine"));
+        assert!(!is_potential_secret_value("echo hello world"));
+        assert!(!is_potential_secret_value("./scripts/deploy.sh"));
+        assert!(!is_potential_secret_value(""));
+        assert!(!is_potential_secret_value("build"));
+        assert!(!is_potential_secret_value("test"));
+    }
+
+    #[test]
+    fn test_values_with_special_chars_not_long_enough() {
+        // Contains spaces, so not all alphanumeric
+        assert!(!is_potential_secret_value("hello world this is a test string"));
+    }
+
+    #[test]
+    fn test_empty_string_not_secret() {
+        assert!(!is_potential_secret_value(""));
+    }
+}

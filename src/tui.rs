@@ -299,3 +299,176 @@ fn render_details(f: &mut ratatui::Frame, area: Rect, app: &App) {
 
     f.render_widget(paragraph, area);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{AuditResult, Issue, Location, Provider, Severity};
+
+    fn make_app(files: Vec<&str>, results: Vec<Option<AuditResult>>) -> App {
+        App {
+            files: files.into_iter().map(String::from).collect(),
+            results,
+            selected: 0,
+            show_details: false,
+        }
+    }
+
+    fn make_result(issues: Vec<Issue>) -> AuditResult {
+        AuditResult {
+            provider: Provider::GitHubActions,
+            issues,
+            summary: format!("0 errors, 0 warnings"),
+        }
+    }
+
+    #[test]
+    fn test_app_navigation_next() {
+        let mut app = make_app(vec!["a.yml", "b.yml", "c.yml"], vec![None, None, None]);
+
+        assert_eq!(app.selected, 0);
+        app.next();
+        assert_eq!(app.selected, 1);
+        app.next();
+        assert_eq!(app.selected, 2);
+        // Should not go past the last item
+        app.next();
+        assert_eq!(app.selected, 2);
+    }
+
+    #[test]
+    fn test_app_navigation_previous() {
+        let mut app = make_app(vec!["a.yml", "b.yml", "c.yml"], vec![None, None, None]);
+        app.selected = 2;
+
+        app.previous();
+        assert_eq!(app.selected, 1);
+        app.previous();
+        assert_eq!(app.selected, 0);
+        // Should not go below 0
+        app.previous();
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn test_app_navigation_single_item() {
+        let mut app = make_app(vec!["single.yml"], vec![None]);
+
+        app.next();
+        assert_eq!(app.selected, 0);
+        app.previous();
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn test_app_toggle_details() {
+        let mut app = make_app(vec!["a.yml"], vec![None]);
+
+        assert!(!app.show_details);
+        app.toggle_details();
+        assert!(app.show_details);
+        app.toggle_details();
+        assert!(!app.show_details);
+    }
+
+    #[test]
+    fn test_app_navigation_with_results() {
+        let issues = vec![Issue::new(
+            Severity::Error,
+            "test error",
+            Some("fix it".to_string()),
+        )];
+        let result = make_result(issues);
+        let mut app = make_app(vec!["ci.yml"], vec![Some(result)]);
+
+        app.next();
+        assert_eq!(app.selected, 0); // only one item
+        app.toggle_details();
+        assert!(app.show_details);
+    }
+
+    #[test]
+    fn test_app_navigation_empty_files() {
+        let mut app = make_app(vec![], vec![]);
+
+        // Navigation on empty list should not crash
+        app.next();
+        assert_eq!(app.selected, 0);
+        app.previous();
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn test_app_navigation_many_files() {
+        let file_names: Vec<String> = (1..=10).map(|i| format!("job-{}.yml", i)).collect();
+        let files: Vec<&str> = file_names.iter().map(|s| s.as_str()).collect();
+        let results: Vec<Option<AuditResult>> = (1..=10)
+            .map(|i| {
+                Some(make_result(vec![Issue::new(
+                    Severity::Warning,
+                    &format!("warning {}", i),
+                    None,
+                )]))
+            })
+            .collect();
+
+        let mut app = make_app(files, results);
+
+        // Navigate all the way down
+        for _ in 0..20 {
+            app.next();
+        }
+        assert_eq!(app.selected, 9);
+
+        // Navigate all the way up
+        for _ in 0..20 {
+            app.previous();
+        }
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn test_app_mixed_severities_display() {
+        let issues = vec![
+            Issue::new(Severity::Error, "error msg", Some("fix error".to_string())),
+            Issue::new(Severity::Warning, "warning msg", None),
+            Issue::new(Severity::Info, "info msg", Some("hint".to_string())),
+        ];
+        let result = make_result(issues);
+        let app = make_app(vec!["mixed.yml"], vec![Some(result)]);
+
+        assert_eq!(app.files.len(), 1);
+        assert_eq!(app.results.len(), 1);
+        if let Some(r) = &app.results[0] {
+            assert_eq!(r.issues.len(), 3);
+        }
+    }
+
+    #[test]
+    fn test_app_with_failed_audit_result() {
+        // App can hold None in results when audit fails
+        let app = make_app(vec!["bad.yml"], vec![None]);
+        assert_eq!(app.files.len(), 1);
+        assert!(app.results[0].is_none());
+    }
+
+    #[test]
+    fn test_app_with_location_info() {
+        let issue = Issue {
+            severity: Severity::Error,
+            message: "syntax error".to_string(),
+            location: Some(Location {
+                line: 10,
+                column: 5,
+                job: Some("build".to_string()),
+            }),
+            suggestion: Some("fix the syntax".to_string()),
+        };
+        let result = make_result(vec![issue]);
+        let app = make_app(vec!["loc.yml"], vec![Some(result)]);
+
+        if let Some(Some(r)) = app.results.get(0) {
+            assert_eq!(r.issues[0].location.as_ref().unwrap().line, 10);
+        }
+    }
+}
