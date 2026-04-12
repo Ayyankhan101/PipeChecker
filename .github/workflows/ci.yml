@@ -9,108 +9,80 @@ on:
 env:
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0
+  SCCACHE_VERSION: "0.8.0"
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  # ─────────────────────────────────────────────
+  # Reusable sccache setup (called via needs + outputs)
+  # GitHub Actions doesn't support true reusable steps, so we use a
+  # composite action pattern via a shared shell block in each job.
+  # ─────────────────────────────────────────────
+
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
 
-      - name: Download sccache
-        shell: bash
-        run: |
-          SCCACHE_VERSION=0.8.0
-          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          curl -L "$SCCACHE_URL" -o sccache.tar.gz
-          tar -xzf sccache.tar.gz
-          mkdir -p $CARGO_HOME/bin/
-          mv sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache $CARGO_HOME/bin/
-          chmod +x $CARGO_HOME/bin/sccache
-
-      - name: Cache sccache
-        uses: actions/cache@v4
+      - name: Install sccache
+        uses: ./.github/actions/sccache
         with:
-          path: ~/.cache/sccache
-          key: ${{ runner.os }}-sccache-lint
-          restore-keys: |
-            ${{ runner.os }}-sccache-
-
-      - name: Start sccache server
-        shell: bash
-        run: $CARGO_HOME/bin/sccache --start-server
+          arch: x86_64-unknown-linux-musl
+        continue-on-error: true
 
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-registry-
 
       - name: Clippy
-        shell: bash
-        run: RUSTC_WRAPPER=$CARGO_HOME/bin/sccache cargo clippy -- -D warnings
+        run: cargo clippy -- -D warnings
 
       - name: Formatting check
         run: cargo fmt -- --check
 
   security:
+    name: Security
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Download sccache
-        shell: bash
-        run: |
-          SCCACHE_VERSION=0.8.0
-          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          curl -L "$SCCACHE_URL" -o sccache.tar.gz
-          tar -xzf sccache.tar.gz
-          mkdir -p $CARGO_HOME/bin/
-          mv sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache $CARGO_HOME/bin/
-          chmod +x $CARGO_HOME/bin/sccache
-
-      - name: Cache sccache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/sccache
-          key: ${{ runner.os }}-sccache-security
-          restore-keys: |
-            ${{ runner.os }}-sccache-
-
-      - name: Start sccache server
-        shell: bash
-        run: $CARGO_HOME/bin/sccache --start-server
-
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
-          key: security-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            security-cargo-
+            ~/.cargo/git/db/
+          key: security-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: security-cargo-registry-
 
       - name: Cache cargo-audit binary
+        id: cache-cargo-audit
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-audit
-          key: cargo-audit-bin-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-audit-bin-v1
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit
+        if: steps.cache-cargo-audit.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked
 
       - name: Run security audit
         run: cargo audit
@@ -123,103 +95,54 @@ jobs:
           command: check bans licenses sources
 
   docs:
+    name: Docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Download sccache
-        shell: bash
-        run: |
-          SCCACHE_VERSION=0.8.0
-          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          curl -L "$SCCACHE_URL" -o sccache.tar.gz
-          tar -xzf sccache.tar.gz
-          mkdir -p $CARGO_HOME/bin/
-          mv sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache $CARGO_HOME/bin/
-          chmod +x $CARGO_HOME/bin/sccache
-
-      - name: Cache sccache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/sccache
-          key: ${{ runner.os }}-sccache-docs
-          restore-keys: |
-            ${{ runner.os }}-sccache-
-
-      - name: Start sccache server
-        shell: bash
-        run: $CARGO_HOME/bin/sccache --start-server
-
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
-          key: docs-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            docs-cargo-
+            ~/.cargo/git/db/
+          key: docs-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: docs-cargo-registry-
 
       - name: Build documentation
-        run: cargo doc --no-deps --document-private-items
-
-      - name: Check for warnings
-        run: RUSTDOCFLAGS="-A warnings" cargo doc --no-deps --document-private-items
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items
 
   coverage:
+    name: Coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Download sccache
-        shell: bash
-        run: |
-          SCCACHE_VERSION=0.8.0
-          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          curl -L "$SCCACHE_URL" -o sccache.tar.gz
-          tar -xzf sccache.tar.gz
-          mkdir -p $CARGO_HOME/bin/
-          mv sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache $CARGO_HOME/bin/
-          chmod +x $CARGO_HOME/bin/sccache
-
-      - name: Cache sccache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/sccache
-          key: ${{ runner.os }}-sccache-coverage
-          restore-keys: |
-            ${{ runner.os }}-sccache-
-
-      - name: Start sccache server
-        shell: bash
-        run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
-          key: coverage-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            coverage-cargo-
+            ~/.cargo/git/db/
+          key: coverage-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: coverage-cargo-registry-
 
-      - name: Cache cargo-tarpaulin
+      - name: Cache cargo-tarpaulin binary
+        id: cache-tarpaulin
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-tarpaulin
-          key: cargo-tarpaulin-bin
+          key: cargo-tarpaulin-bin-v1
 
       - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin
+        if: steps.cache-tarpaulin.outputs.cache-hit != 'true'
+        run: cargo install cargo-tarpaulin --locked
 
       - name: Generate coverage report
         run: cargo tarpaulin --out Json --output-dir ./coverage --fail-under 60
@@ -234,34 +157,54 @@ jobs:
       - name: Generate summary
         run: |
           echo "## Code Coverage" >> $GITHUB_STEP_SUMMARY
-          echo "Reports available as artifact" >> $GITHUB_STEP_SUMMARY
-          cat coverage/summary.json 2>/dev/null || echo "Coverage report generated"
+          cat coverage/tarpaulin-report.json 2>/dev/null \
+            | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          covered = d.get('covered', 0)
+          coverable = d.get('coverable', 1)
+          pct = covered / coverable * 100
+          print(f'**Coverage: {pct:.1f}%** ({covered}/{coverable} lines)')
+          " >> $GITHUB_STEP_SUMMARY || echo "Coverage report generated" >> $GITHUB_STEP_SUMMARY
+
+  # ─────────────────────────────────────────────
+  # Test matrix — full (push to main) vs. reduced (pull request)
+  # ─────────────────────────────────────────────
 
   test:
+    name: Test (${{ matrix.target }})
     needs: [lint, security, docs]
     runs-on: ${{ matrix.os }}
-    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
         include:
+          # ── Push to main: full matrix including ARM ──────────────────────
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             sccache-arch: x86_64-unknown-linux-musl
+            run-on-pr: true
 
           - os: macos-latest
             target: aarch64-apple-darwin
             sccache-arch: aarch64-apple-darwin
+            run-on-pr: true
 
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             sccache-arch: x86_64-pc-windows-msvc
+            run-on-pr: true
 
-          # ARM64 Linux via cross-compilation (works on free GitHub plans)
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             sccache-arch: x86_64-unknown-linux-musl
             use-cross: true
+            run-on-pr: false   # cross-compile skipped on PRs
+
+    # Skip non-PR entries when this is a pull_request event
+    if: >
+      github.event_name != 'pull_request' ||
+      matrix.run-on-pr == true
 
     steps:
       - uses: actions/checkout@v4
@@ -270,154 +213,94 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Download sccache
+      - name: Install sccache (Linux / macOS)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
-          SCCACHE_VERSION=0.8.0
-          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${{ matrix.sccache-arch }}.tar.gz"
-          curl -L "$SCCACHE_URL" -o sccache.tar.gz
-          tar -xzf sccache.tar.gz
-          mkdir -p $CARGO_HOME/bin/
-          mv sccache-v${SCCACHE_VERSION}-${{ matrix.sccache-arch }}/sccache $CARGO_HOME/bin/
-          chmod +x $CARGO_HOME/bin/sccache
+          URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${{ matrix.sccache-arch }}.tar.gz"
+          curl -sSL "$URL" | tar -xz
+          mkdir -p "$CARGO_HOME/bin"
+          mv "sccache-v${SCCACHE_VERSION}-${{ matrix.sccache-arch }}/sccache" "$CARGO_HOME/bin/"
+          chmod +x "$CARGO_HOME/bin/sccache"
+          echo "RUSTC_WRAPPER=$CARGO_HOME/bin/sccache" >> "$GITHUB_ENV"
+          "$CARGO_HOME/bin/sccache" --start-server
 
-      - name: Cache sccache
+      - name: Install sccache (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/mozilla/sccache/releases/download/v$env:SCCACHE_VERSION/sccache-v$env:SCCACHE_VERSION-${{ matrix.sccache-arch }}.tar.gz"
+          Invoke-WebRequest $url -OutFile sccache.tar.gz
+          tar -xzf sccache.tar.gz
+          $dest = "$env:CARGO_HOME\bin"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Move-Item "sccache-v$env:SCCACHE_VERSION-${{ matrix.sccache-arch }}\sccache.exe" "$dest\sccache.exe"
+          echo "RUSTC_WRAPPER=$dest\sccache.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          & "$dest\sccache.exe" --start-server
+
+      - name: Cache sccache storage
         uses: actions/cache@v4
         with:
           path: ~/.cache/sccache
-          key: ${{ runner.os }}-sccache-${{ matrix.target }}
+          key: ${{ runner.os }}-sccache-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
+            ${{ runner.os }}-sccache-${{ matrix.target }}-
             ${{ runner.os }}-sccache-
-
-      - name: Start sccache server
-        shell: bash
-        run: $CARGO_HOME/bin/sccache --start-server
 
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-registry-
 
-      - name: Cache target directory
+      - name: Cache build artifacts
         uses: actions/cache@v4
         with:
           path: target
-          key: ${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-
+          key: ${{ runner.os }}-${{ matrix.target }}-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.target }}-target-
 
       - name: Install cross
         if: matrix.use-cross == true
-        run: cargo install cross --quiet
+        run: |
+          if ! command -v cross &>/dev/null; then
+            cargo install cross --locked
+          fi
 
-      - name: Build (cross)
-        if: matrix.use-cross == true
+      - name: Build
         shell: bash
-        run: cross build --target ${{ matrix.target }}
+        run: |
+          if [ "${{ matrix.use-cross }}" = "true" ]; then
+            cross build --target ${{ matrix.target }}
+          else
+            cargo build --target ${{ matrix.target }}
+          fi
 
-      - name: Build (native)
-        if: matrix.use-cross != true
+      - name: Run tests
         shell: bash
-        run: RUSTC_WRAPPER=$CARGO_HOME/bin/sccache cargo build --target ${{ matrix.target }}
-
-      - name: Run tests (cross)
-        if: matrix.use-cross == true
-        run: cross test --target ${{ matrix.target }}
-
-      - name: Run tests (native)
-        if: matrix.use-cross != true
-        run: cargo test --target ${{ matrix.target }}
+        run: |
+          if [ "${{ matrix.use-cross }}" = "true" ]; then
+            cross test --target ${{ matrix.target }}
+          else
+            cargo test --target ${{ matrix.target }}
+          fi
 
       - name: Test CLI
         if: matrix.use-cross != true
+        shell: bash
         run: |
           cargo run -- -- tests/fixtures/github/valid.yml
           cargo run -- tests/fixtures/github/circular.yml || true
 
-  test-pr:
-    needs: [lint, security, docs]
-    runs-on: ${{ matrix.os }}
-    if: github.event_name == 'pull_request'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            sccache-arch: x86_64-unknown-linux-musl
-
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            sccache-arch: aarch64-apple-darwin
-
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            sccache-arch: x86_64-pc-windows-msvc
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Download sccache
+      - name: Print sccache stats
+        if: runner.os != 'Windows'
         shell: bash
-        run: |
-          SCCACHE_VERSION=0.8.0
-          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${{ matrix.sccache-arch }}.tar.gz"
-          curl -L "$SCCACHE_URL" -o sccache.tar.gz
-          tar -xzf sccache.tar.gz
-          mkdir -p $CARGO_HOME/bin/
-          mv sccache-v${SCCACHE_VERSION}-${{ matrix.sccache-arch }}/sccache $CARGO_HOME/bin/
-          chmod +x $CARGO_HOME/bin/sccache
-
-      - name: Cache sccache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/sccache
-          key: ${{ runner.os }}-sccache-${{ matrix.target }}
-          restore-keys: |
-            ${{ runner.os }}-sccache-
-
-      - name: Start sccache server
-        shell: bash
-        run: $CARGO_HOME/bin/sccache --start-server
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-
-
-      - name: Build
-        shell: bash
-        run: RUSTC_WRAPPER=$CARGO_HOME/bin/sccache cargo build --target ${{ matrix.target }}
-
-      - name: Run tests
-        run: cargo test --target ${{ matrix.target }}
-
+        run: $CARGO_HOME/bin/sccache --show-stats
+        continue-on-error: true
       - name: Test CLI
         run: |
           cargo run -- -- tests/fixtures/github/valid.yml
