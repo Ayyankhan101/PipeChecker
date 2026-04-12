@@ -1,6 +1,6 @@
 [package]
 name = "pipechecker"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 authors = ["Pipecheck Contributors"]
 description = "CI/CD Pipeline Auditor - Catch errors before you push"
