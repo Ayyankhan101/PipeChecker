@@ -77,9 +77,10 @@ jobs:
           ADVISORY_DB_CACHE_DIR: /tmp/advisory-db
 
       - name: Run cargo deny
-        uses: EmbarkStudios/cargo-deny-action@v2
+        uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check bans licenses sources
+          arguments: --all-features
 
   docs:
     name: Docs

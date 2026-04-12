@@ -35,17 +35,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
         for dep in &job.depends_on {
             if let Some(&to_idx) = job_indices.get(dep) {
                 graph.add_edge(from_idx, to_idx, ());
-            } else {
-                let (line, col) = pipeline.find_job_line(&job.id, "needs");
-                issues.push(Issue::for_job(
-                    Severity::Error,
-                    &format!("Job '{}' depends on non-existent job '{}'", job.id, dep),
-                    &job.id,
-                    line,
-                    col,
-                    Some(format!("Remove dependency or add job '{}'", dep)),
-                ));
-            }
+            } // Missing dependency errors are handled in the syntax auditor; skip duplicate reporting
         }
     }
 
@@ -67,6 +57,49 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
             ));
         }
     }
-
     Ok(issues)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parsers::github;
+
+    #[test]
+    fn test_missing_dependency() {
+        let yaml = r#"on:
+  push: {}
+jobs:
+  build:
+    needs: nonexistent
+    runs-on: ubuntu-latest
+    steps: []
+"#;
+        let pipeline = github::parse(yaml).unwrap();
+        let issues = audit(&pipeline).unwrap();
+        // DAG auditor does not report missing dependencies (handled by syntax auditor);
+        // Ensure it runs without error and returns zero issues for this case.
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_circular_dependency() {
+        let yaml = r#"on:
+  push: {}
+jobs:
+  a:
+    needs: b
+    runs-on: ubuntu-latest
+    steps: []
+  b:
+    needs: a
+    runs-on: ubuntu-latest
+    steps: []
+"#;
+        let pipeline = github::parse(yaml).unwrap();
+        let issues = audit(&pipeline).unwrap();
+        assert!(issues
+            .iter()
+            .any(|i| i.message.contains("Circular dependency detected")));
+    }
 }

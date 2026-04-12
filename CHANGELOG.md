@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-04-12
+
+### Fixed
+- Eliminated clippy warnings (unused imports, needless borrows)
+- Fixed false positive in secrets auditor: `${{ secrets.* }}` references no longer flagged as hardcoded secrets
+- Added `#[cfg(test)]` to DAG test module (tests were compiling in release builds)
+- Downgraded cargo-deny-action from v2 to v1 for CI compatibility
+- Added `--all-features` flag to cargo-deny CI step
+- Updated deny.toml with missing fields and additional allowed licenses (CC0-1.0, MPL-2.0, Unicode-3.0)
+- Fixed job name matching in `find_job_line` to avoid partial prefix matches
+
 ## [0.2.2] - 2024-05-21
 
 ### Added

@@ -84,10 +84,15 @@ impl Pipeline {
     pub fn find_job_line(&self, job_id: &str, key_hint: &str) -> (usize, usize) {
         for (idx, line) in self.source.lines().enumerate() {
             let trimmed = line.trim();
-            // Detect job block start: "  job_id:"
-            if trimmed.starts_with(&format!("{}:", job_id)) {
-                let column = line.len() - line.trim_start().len() + 1;
-                return (idx + 1, column);
+            // Detect job block start: "  job_id:" (exact match or followed by whitespace)
+            let prefix = format!("{}:", job_id);
+            if trimmed.starts_with(&prefix) {
+                // Ensure we aren't matching a longer job name that merely starts with this prefix
+                let remainder = &trimmed[prefix.len()..];
+                if remainder.is_empty() || remainder.starts_with(char::is_whitespace) {
+                    let column = line.len() - line.trim_start().len() + 1;
+                    return (idx + 1, column);
+                }
             }
             // Inside job block, look for the key
             if trimmed.starts_with(&format!("{}:", key_hint)) {

@@ -57,7 +57,18 @@ pub fn audit_content(content: &str, options: AuditOptions) -> Result<AuditResult
 
     if options.check_docker_images {
         #[cfg(feature = "network")]
-        issues.extend(auditors::pinning::audit(&pipeline)?);
+        {
+            issues.extend(auditors::pinning::audit(&pipeline)?);
+        }
+        #[cfg(not(feature = "network"))]
+        {
+            // Network feature disabled; emit informative issue.
+            issues.push(Issue::new(
+                Severity::Info,
+                "Docker image pinning checks are disabled because the 'network' feature is not enabled.",
+                Some("Enable the 'network' feature to run image checks".to_string()),
+            ));
+        }
     }
 
     let summary = generate_summary(&issues);

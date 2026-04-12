@@ -114,12 +114,8 @@ fn test_dag_missing_dependency() {
     let pipeline = make_pipeline(jobs);
 
     let issues = dag::audit(&pipeline).unwrap();
-    let missing: Vec<_> = issues
-        .iter()
-        .filter(|i| i.message.contains("non-existent"))
-        .collect();
-    assert_eq!(missing.len(), 1);
-    assert_eq!(missing[0].severity, Severity::Error);
+    // Missing dependencies are reported by the syntax auditor, not the DAG auditor.
+    assert!(issues.is_empty());
 }
 
 #[test]

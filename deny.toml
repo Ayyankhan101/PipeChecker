@@ -4,14 +4,17 @@
 [graph]
 targets = []
 all-features = true
+exclude = []
 
 [advisories]
 db-path = "~/.cargo/advisory-db"
 ignore = []
+yanked = "deny"
 
 [bans]
 multiple-versions = "warn"
 wildcards = "allow"
+deny = []
 skip = []
 
 [licenses]
@@ -22,11 +25,14 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
-    "Unicode-DFS-2016",
+    "MPL-2.0",
+    "Unicode-3.0",
     "Unlicense",
     "Zlib",
     "OpenSSL",
+    "CC0-1.0",
 ]
+deny = []
 confidence-threshold = 0.8
 
 [[licenses.clarify]]
@@ -37,3 +43,5 @@ license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 [sources]
 unknown-registry = "warn"
 unknown-git = "warn"
+allow-git = []
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

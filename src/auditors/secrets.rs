@@ -10,6 +10,9 @@
 use crate::error::Result;
 use crate::models::{Issue, Pipeline, Severity};
 use regex::Regex;
+use std::sync::OnceLock;
+static SECRET_REGEX: OnceLock<Regex> = OnceLock::new();
+static ENV_REGEX: OnceLock<Regex> = OnceLock::new();
 use std::collections::HashSet;
 
 /// Patterns that indicate hardcoded secrets
@@ -41,8 +44,9 @@ const SECRET_VALUE_PATTERNS: &[&str] = &[
 pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
     let mut issues = Vec::new();
 
-    let secret_pattern = Regex::new(r"\$\{\{\s*secrets\.(\w+)\s*\}\}").unwrap();
-    let env_pattern = Regex::new(r"\$\{\{\s*env\.(\w+)\s*\}\}").unwrap();
+    let secret_pattern =
+        SECRET_REGEX.get_or_init(|| Regex::new(r"\$\{\{\s*secrets\.(\w+)\s*\}\}").unwrap());
+    let env_pattern = ENV_REGEX.get_or_init(|| Regex::new(r"\$\{\{\s*env\.(\w+)\s*\}\}").unwrap());
 
     let mut declared_env: HashSet<String> = pipeline.env.iter().map(|e| e.key.clone()).collect();
 
@@ -150,8 +154,8 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                 scan_yaml_for_secrets(
                     with_val,
                     &job.id,
-                    &secret_pattern,
-                    &env_pattern,
+                    secret_pattern,
+                    env_pattern,
                     &declared_env,
                     pipeline,
                     &mut issues,
@@ -237,6 +241,11 @@ fn scan_yaml_for_secrets(
 
 /// Check if a value looks like it might be a secret
 fn is_potential_secret_value(value: &str) -> bool {
+    // Skip GitHub Actions secret references — these are the correct way to use secrets
+    if value.contains("${{ secrets.") || value.contains("${{secrets.") {
+        return false;
+    }
+
     let lower = value.to_lowercase();
 
     // Check if the value contains suspicious patterns

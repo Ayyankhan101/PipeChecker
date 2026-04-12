@@ -56,7 +56,15 @@ pub fn fix_file(path: &str) -> std::io::Result<FixResult> {
     let result = fix_content(&content);
 
     if result.fixed > 0 {
-        fs::write(path, result.changes.join("\n"))?;
+        // Exclude warning messages from being written back to the file.
+        let cleaned: String = result
+            .changes
+            .iter()
+            .filter(|line| !line.trim_start().starts_with("⚠️"))
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n");
+        fs::write(path, cleaned)?;
     }
 
     Ok(result)
