@@ -46,6 +46,7 @@ impl App {
             let opts = AuditOptions {
                 check_docker_images: options.check_docker_images,
                 strict_mode: options.strict_mode,
+                rules: options.rules.clone(),
             };
             let result = audit_file(file, opts).ok();
             results.push(result);
@@ -319,6 +320,7 @@ mod tests {
             provider: Provider::GitHubActions,
             issues,
             summary: format!("0 errors, 0 warnings"),
+            elapsed: std::time::Duration::from_millis(0),
         }
     }
 

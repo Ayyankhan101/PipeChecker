@@ -21,6 +21,7 @@
 
 use std::fs;
 use std::path::Path;
+use std::time::Instant;
 
 pub mod auditors;
 pub mod config;
@@ -31,7 +32,7 @@ pub mod parsers;
 pub mod tui;
 
 pub use config::load as load_config;
-pub use config::Config;
+pub use config::{Config, Rules};
 pub use error::{PipecheckError, Result};
 pub use models::{AuditOptions, AuditResult, Issue, Severity};
 
@@ -45,6 +46,8 @@ pub fn audit_file(path: &str, options: AuditOptions) -> Result<AuditResult> {
 /// Audit pipeline configuration content
 #[must_use = "audit results should be handled"]
 pub fn audit_content(content: &str, options: AuditOptions) -> Result<AuditResult> {
+    let start = Instant::now();
+
     let provider = parsers::detect_provider(content)?;
     let pipeline = parsers::parse(content, provider)?;
 
@@ -52,31 +55,61 @@ pub fn audit_content(content: &str, options: AuditOptions) -> Result<AuditResult
 
     // Run all auditors
     issues.extend(auditors::syntax::audit(&pipeline)?);
-    issues.extend(auditors::dag::audit(&pipeline)?);
-    issues.extend(auditors::secrets::audit(&pipeline)?);
+
+    // DAG / cycle detection — respect config toggle
+    if options
+        .rules
+        .as_ref()
+        .map(|r| r.circular_dependencies)
+        .unwrap_or(true)
+    {
+        issues.extend(auditors::dag::audit(&pipeline)?);
+    }
+
+    // Secrets — respect config toggle
+    if options
+        .rules
+        .as_ref()
+        .map(|r| r.missing_secrets)
+        .unwrap_or(true)
+    {
+        issues.extend(auditors::secrets::audit(&pipeline)?);
+    }
+
+    // Timeout auditor (always on — no config toggle yet)
+    issues.extend(auditors::timeout::audit(&pipeline)?);
 
     if options.check_docker_images {
-        #[cfg(feature = "network")]
+        // Pinning auditor — respect docker_latest_tag toggle
+        if options
+            .rules
+            .as_ref()
+            .map(|r| r.docker_latest_tag)
+            .unwrap_or(true)
         {
-            issues.extend(auditors::pinning::audit(&pipeline)?);
-        }
-        #[cfg(not(feature = "network"))]
-        {
-            // Network feature disabled; emit informative issue.
-            issues.push(Issue::new(
-                Severity::Info,
-                "Docker image pinning checks are disabled because the 'network' feature is not enabled.",
-                Some("Enable the 'network' feature to run image checks".to_string()),
-            ));
+            #[cfg(feature = "network")]
+            {
+                issues.extend(auditors::pinning::audit(&pipeline)?);
+            }
+            #[cfg(not(feature = "network"))]
+            {
+                issues.push(Issue::new(
+                    Severity::Info,
+                    "Docker image pinning checks are disabled because the 'network' feature is not enabled.",
+                    Some("Enable the 'network' feature to run image checks".to_string()),
+                ));
+            }
         }
     }
 
     let summary = generate_summary(&issues);
+    let elapsed = start.elapsed();
 
     Ok(AuditResult {
         provider,
         issues,
         summary,
+        elapsed,
     })
 }
 

@@ -1,4 +1,6 @@
+use crate::config::Rules;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Provider {
@@ -108,6 +110,8 @@ impl Pipeline {
 pub struct AuditOptions {
     pub check_docker_images: bool,
     pub strict_mode: bool,
+    /// Rule toggles loaded from config file
+    pub rules: Option<Rules>,
 }
 
 impl Default for AuditOptions {
@@ -115,6 +119,7 @@ impl Default for AuditOptions {
         Self {
             check_docker_images: true,
             strict_mode: false,
+            rules: None,
         }
     }
 }
@@ -124,6 +129,9 @@ pub struct AuditResult {
     pub provider: Provider,
     pub issues: Vec<Issue>,
     pub summary: String,
+    /// Time taken to perform the audit
+    #[serde(skip)]
+    pub elapsed: Duration,
 }
 
 /// Common pipeline representation
@@ -147,6 +155,8 @@ pub struct Job {
     pub container_image: Option<String>,
     /// Docker images used in job-level `services:` (GitHub Actions)
     pub service_images: Vec<String>,
+    /// Timeout in minutes for the job (GitHub Actions `timeout-minutes`)
+    pub timeout_minutes: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -446,6 +456,7 @@ mod tests {
             env: vec![],
             container_image: None,
             service_images: vec![],
+            timeout_minutes: None,
         };
 
         assert_eq!(job.depends_on.len(), 2);
@@ -463,6 +474,7 @@ mod tests {
             env: vec![],
             container_image: Some("node:18".to_string()),
             service_images: vec!["postgres:15".to_string(), "redis:7".to_string()],
+            timeout_minutes: None,
         };
 
         assert_eq!(job.container_image, Some("node:18".to_string()));

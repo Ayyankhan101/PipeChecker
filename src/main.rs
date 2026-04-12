@@ -1,6 +1,11 @@
 use clap::Parser;
 use pipechecker::{audit_file, discover_workflows, load_config, AuditOptions, DiscoveryOptions};
-use std::{fs, path::Path, process, thread, time::Duration};
+use std::{
+    fs,
+    path::Path,
+    process, thread,
+    time::{Duration, Instant},
+};
 
 /// Auto-detect a single workflow file from common patterns.
 /// Uses `discover_workflows` under the hood, then prefers known filenames.
@@ -78,6 +83,14 @@ struct Cli {
     /// Enable strict mode (warnings as errors)
     #[arg(short, long)]
     strict: bool,
+
+    /// Quiet mode — only show errors
+    #[arg(short, long)]
+    quiet: bool,
+
+    /// Verbose mode — show detailed diagnostic information
+    #[arg(long)]
+    verbose: bool,
 }
 
 fn main() {
@@ -97,6 +110,7 @@ fn main() {
         let options = AuditOptions {
             check_docker_images: !cli.no_pinning,
             strict_mode: cli.strict,
+            rules: Some(load_config().rules),
         };
         if let Err(e) = pipechecker::tui::run_tui(options) {
             eprintln!("TUI error: {}", e);
@@ -136,17 +150,44 @@ fn main() {
     let options = AuditOptions {
         check_docker_images: !cli.no_pinning,
         strict_mode: cli.strict,
+        rules: Some(load_config().rules),
     };
 
     if cli.all {
-        audit_all_workflows(options, &cli.format, cli.strict);
+        audit_all_workflows(options, &cli.format, cli.strict, cli.quiet, cli.verbose);
         return;
     }
 
     let file = cli.file.unwrap_or_else(auto_detect_workflow);
 
+    if cli.verbose {
+        eprintln!("📄 Auditing: {}", file);
+    }
+
     match audit_file(&file, options) {
         Ok(result) => {
+            if cli.verbose {
+                eprintln!("🔍 Auditors ran: syntax, dag, secrets, pinning");
+                eprintln!(
+                    "📊 Found: {} errors, {} warnings, {} info",
+                    result
+                        .issues
+                        .iter()
+                        .filter(|i| i.severity == pipechecker::Severity::Error)
+                        .count(),
+                    result
+                        .issues
+                        .iter()
+                        .filter(|i| i.severity == pipechecker::Severity::Warning)
+                        .count(),
+                    result
+                        .issues
+                        .iter()
+                        .filter(|i| i.severity == pipechecker::Severity::Info)
+                        .count(),
+                );
+            }
+
             if cli.format == "json" {
                 println!("{}", serde_json::to_string_pretty(&result).unwrap());
             } else {
@@ -155,6 +196,11 @@ fn main() {
                 println!();
 
                 for issue in &result.issues {
+                    // In quiet mode, only show errors
+                    if cli.quiet && issue.severity != pipechecker::Severity::Error {
+                        continue;
+                    }
+
                     let prefix = match issue.severity {
                         pipechecker::Severity::Error => "❌ ERROR",
                         pipechecker::Severity::Warning => "⚠️  WARNING",
@@ -176,6 +222,11 @@ fn main() {
                         println!("   💡 {}", suggestion);
                     }
                     println!();
+                }
+
+                // Only show timing in non-quiet mode
+                if !cli.quiet {
+                    println!("⏱️  Checked in {:.1}ms", result.elapsed.as_millis());
                 }
             }
 
@@ -266,10 +317,11 @@ fn watch_mode(cli: &Cli) {
     let options = AuditOptions {
         check_docker_images: !cli.no_pinning,
         strict_mode: cli.strict,
+        rules: Some(load_config().rules),
     };
 
     if cli.all {
-        audit_all_workflows(options, &cli.format, cli.strict);
+        audit_all_workflows(options, &cli.format, cli.strict, cli.quiet, cli.verbose);
     } else if let Some(file) = &cli.file {
         let _ = audit_file(file, options);
     }
@@ -298,6 +350,7 @@ fn watch_mode(cli: &Cli) {
                         let opts = AuditOptions {
                             check_docker_images: !cli.no_pinning,
                             strict_mode: cli.strict,
+                            rules: Some(load_config().rules),
                         };
                         let _ = audit_file(file, opts);
                     }
@@ -309,7 +362,13 @@ fn watch_mode(cli: &Cli) {
     }
 }
 
-fn audit_all_workflows(options: AuditOptions, format: &str, strict: bool) {
+fn audit_all_workflows(
+    options: AuditOptions,
+    format: &str,
+    strict: bool,
+    quiet: bool,
+    verbose: bool,
+) {
     let config = load_config();
     let all_files = discover_workflows(Path::new("."), &DiscoveryOptions::default());
 
@@ -318,8 +377,17 @@ fn audit_all_workflows(options: AuditOptions, format: &str, strict: bool) {
         process::exit(1);
     }
 
+    if verbose {
+        eprintln!("📄 Discovered {} workflow file(s)", all_files.len());
+        for f in &all_files {
+            eprintln!("   - {}", f);
+        }
+        eprintln!();
+    }
+
     eprintln!("Checking {} workflow file(s)...\n", all_files.len());
 
+    let total_start = Instant::now();
     let mut total_errors = 0;
     let mut total_warnings = 0;
 
@@ -331,15 +399,13 @@ fn audit_all_workflows(options: AuditOptions, format: &str, strict: bool) {
         let opts = AuditOptions {
             check_docker_images: options.check_docker_images,
             strict_mode: options.strict_mode,
+            rules: options.rules.clone(),
         };
         match audit_file(file, opts) {
             Ok(result) => {
                 if format == "json" {
                     println!("{}", serde_json::to_string_pretty(&result).unwrap());
                 } else {
-                    println!("📄 {}", file);
-                    println!("   Provider: {:?}", result.provider);
-
                     let errors = result
                         .issues
                         .iter()
@@ -354,22 +420,34 @@ fn audit_all_workflows(options: AuditOptions, format: &str, strict: bool) {
                     total_errors += errors;
                     total_warnings += warnings;
 
-                    if errors > 0 || warnings > 0 {
-                        println!("   {} errors, {} warnings", errors, warnings);
+                    if quiet {
+                        // Only print errors in quiet mode
                         for issue in &result.issues {
-                            if issue.severity != pipechecker::Severity::Info {
-                                let prefix = match issue.severity {
-                                    pipechecker::Severity::Error => "❌",
-                                    pipechecker::Severity::Warning => "⚠️",
-                                    _ => "ℹ️",
-                                };
-                                println!("   {} {}", prefix, issue.message);
+                            if issue.severity == pipechecker::Severity::Error {
+                                println!("❌ {} (in {})", issue.message, file);
                             }
                         }
                     } else {
-                        println!("   ✅ No issues found");
+                        println!("📄 {}", file);
+                        println!("   Provider: {:?}", result.provider);
+
+                        if errors > 0 || warnings > 0 {
+                            println!("   {} errors, {} warnings", errors, warnings);
+                            for issue in &result.issues {
+                                if issue.severity != pipechecker::Severity::Info {
+                                    let prefix = match issue.severity {
+                                        pipechecker::Severity::Error => "❌",
+                                        pipechecker::Severity::Warning => "⚠️",
+                                        _ => "ℹ️",
+                                    };
+                                    println!("   {} {}", prefix, issue.message);
+                                }
+                            }
+                        } else {
+                            println!("   ✅ No issues found");
+                        }
+                        println!();
                     }
-                    println!();
                 }
             }
             Err(e) => {
@@ -387,6 +465,7 @@ fn audit_all_workflows(options: AuditOptions, format: &str, strict: bool) {
             total_warnings,
             all_files.len()
         );
+        println!("⏱️  Checked in {:.1}ms", total_start.elapsed().as_millis());
     }
 
     if total_errors > 0 || (strict && total_warnings > 0) {

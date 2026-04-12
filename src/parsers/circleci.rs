@@ -231,6 +231,9 @@ fn parse_job(
     // Get dependencies from workflow definition
     let depends_on = workflow_deps.get(id).cloned().unwrap_or_default();
 
+    // Parse CircleCI's `max_time` (equivalent to timeout-minutes)
+    let timeout_minutes = map.get("max_time").and_then(|v| v.as_u64());
+
     Ok(Job {
         id: id.to_string(),
         name: None,
@@ -239,5 +242,6 @@ fn parse_job(
         env,
         container_image,
         service_images: Vec::new(),
+        timeout_minutes,
     })
 }

@@ -48,6 +48,23 @@ pub struct FixResult {
     pub changes: Vec<String>,
 }
 
+/// Known Docker image mappings (image:latest -> pinned reference)
+const KNOWN_DOCKER_IMAGES: &[(&str, &str)] = &[
+    ("node:latest", "node:20-alpine"),
+    ("python:latest", "python:3.12-slim"),
+    ("ruby:latest", "ruby:3.3-slim"),
+    ("nginx:latest", "nginx:1.25-alpine"),
+    ("postgres:latest", "postgres:16-alpine"),
+    ("redis:latest", "redis:7-alpine"),
+    ("mysql:latest", "mysql:8.0"),
+    ("ubuntu:latest", "ubuntu:22.04"),
+    ("alpine:latest", "alpine:3.19"),
+    ("golang:latest", "golang:1.22-alpine"),
+    ("rust:latest", "rust:1.75-slim"),
+    ("maven:latest", "maven:3.9-eclipse-temurin-21"),
+    ("gradle:latest", "gradle:8.6-jdk21"),
+];
+
 /// Attempt to auto-fix a workflow file
 ///
 /// Returns the number of fixes applied and a description of each change.
@@ -77,10 +94,14 @@ fn fix_content(content: &str) -> FixResult {
 
     // Build a lookup map for known actions
     let action_map: HashMap<&str, &str> = KNOWN_ACTIONS.iter().cloned().collect();
+    // Build a lookup map for known Docker images
+    let docker_map: HashMap<&str, &str> = KNOWN_DOCKER_IMAGES.iter().cloned().collect();
 
     for line in content.lines() {
         let trimmed = line.trim_start();
-        // Check for unpinned action references (handles both `- uses:` and `uses:` forms)
+        let indent = line.len() - line.trim_start().len();
+
+        // Check for unpinned action references
         let uses_stripped = trimmed.strip_prefix("- ").unwrap_or(trimmed);
         if uses_stripped.starts_with("uses:") {
             let uses_value = uses_stripped
@@ -89,29 +110,51 @@ fn fix_content(content: &str) -> FixResult {
                 .trim_matches('"')
                 .trim_matches('\'');
 
-            // Check if this is a GitHub Action without version pinning
             if !uses_value.contains('@')
                 && !uses_value.contains(':')
                 && !uses_value.starts_with("./")
             {
                 if let Some(pinned) = action_map.get(uses_value) {
-                    // Replace the line with the pinned version
-                    let indent = line.len() - line.trim_start().len();
                     let new_line = format!("{}uses: {}", " ".repeat(indent), pinned);
                     changes.push(new_line);
                     fixed += 1;
+                    continue;
                 } else {
                     changes.push(format!(
                         "  ⚠️  Unknown action (no auto-fix available): {}",
                         uses_value
                     ));
+                    continue;
                 }
-            } else {
-                changes.push(line.to_string());
             }
-        } else {
-            changes.push(line.to_string());
         }
+
+        // Check for Docker :latest tags in image: or container: lines
+        if trimmed.starts_with("image:")
+            || trimmed.starts_with("- image:")
+            || trimmed.starts_with("container:")
+        {
+            // For container: the image is usually on the next line, skip here
+            if !trimmed.starts_with("container:") {
+                let image_val = trimmed
+                    .trim_start_matches("image:")
+                    .trim_start_matches("- image:")
+                    .trim();
+                if let Some(pinned) = docker_map.get(image_val) {
+                    let prefix = if trimmed.starts_with("- image:") {
+                        "- image:"
+                    } else {
+                        "image:"
+                    };
+                    let new_line = format!("{}{} {}", " ".repeat(indent), prefix, pinned);
+                    changes.push(new_line);
+                    fixed += 1;
+                    continue;
+                }
+            }
+        }
+
+        changes.push(line.to_string());
     }
 
     FixResult { fixed, changes }
@@ -155,6 +198,36 @@ jobs:
     #[test]
     fn test_skip_local_actions() {
         let input = r#"      - uses: ./scripts/my-action
+"#;
+        let result = fix_content(input);
+        assert_eq!(result.fixed, 0);
+    }
+
+    #[test]
+    fn test_fix_docker_latest() {
+        let input = r#"name: CI
+on: push
+jobs:
+  build:
+    container:
+      image: node:latest
+    services:
+      db:
+        image: postgres:latest
+"#;
+        let result = fix_content(input);
+        assert_eq!(result.fixed, 2);
+        assert!(result.changes.iter().any(|c| c.contains("node:20-alpine")));
+        assert!(result
+            .changes
+            .iter()
+            .any(|c| c.contains("postgres:16-alpine")));
+    }
+
+    #[test]
+    fn test_skip_already_pinned_docker() {
+        let input = r#"    container:
+      image: node:20-alpine
 "#;
         let result = fix_content(input);
         assert_eq!(result.fixed, 0);

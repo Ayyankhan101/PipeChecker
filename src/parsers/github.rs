@@ -124,6 +124,11 @@ pub fn parse(content: &str) -> Result<Pipeline> {
             _ => Vec::new(),
         };
 
+        // Parse timeout-minutes
+        let timeout_minutes = job_map
+            .get(Value::String("timeout-minutes".into()))
+            .and_then(|v| v.as_u64());
+
         let job_env = parse_env_map(job_map.get(Value::String("env".into())));
 
         jobs.push(Job {
@@ -134,6 +139,7 @@ pub fn parse(content: &str) -> Result<Pipeline> {
             env: job_env,
             container_image,
             service_images,
+            timeout_minutes,
         });
     }
 

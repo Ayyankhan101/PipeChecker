@@ -24,6 +24,7 @@ fn create_test_job(id: &str, needs: Vec<String>, steps: Vec<Step>) -> Job {
         env: vec![],
         container_image: None,
         service_images: vec![],
+        timeout_minutes: None,
     }
 }
 
@@ -191,6 +192,7 @@ fn test_secrets_ignores_declared_env() {
         }],
         container_image: None,
         service_images: vec![],
+        timeout_minutes: None,
     }];
 
     let pipeline = make_pipeline(jobs);
@@ -267,6 +269,7 @@ fn test_pinning_detects_docker_container_latest() {
         env: vec![],
         container_image: Some("nginx:latest".to_string()),
         service_images: vec![],
+        timeout_minutes: None,
     }];
     let pipeline = make_pipeline(jobs);
 
@@ -305,6 +308,7 @@ fn test_secrets_catches_hardcoded_env_value() {
         }],
         container_image: None,
         service_images: vec![],
+        timeout_minutes: None,
     }];
     let pipeline = make_pipeline(jobs);
 

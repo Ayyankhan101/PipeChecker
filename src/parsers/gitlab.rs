@@ -94,6 +94,7 @@ fn parse_job(id: &str, map: &serde_yaml::Mapping) -> Result<Job> {
     let mut env = Vec::new();
     let mut container_image: Option<String> = None;
     let mut service_images: Vec<String> = Vec::new();
+    let mut timeout_minutes: Option<u64> = None;
 
     // Parse image
     if let Some(image_val) = map.get("image") {
@@ -103,6 +104,13 @@ fn parse_job(id: &str, map: &serde_yaml::Mapping) -> Result<Job> {
             if let Some(Value::String(s)) = m.get(Value::String("name".to_string())) {
                 container_image = Some(s.clone());
             }
+        }
+    }
+
+    // Parse timeout
+    if let Some(timeout_val) = map.get("timeout") {
+        if let Some(n) = timeout_val.as_u64() {
+            timeout_minutes = Some(n);
         }
     }
 
@@ -218,5 +226,6 @@ fn parse_job(id: &str, map: &serde_yaml::Mapping) -> Result<Job> {
         env,
         container_image,
         service_images,
+        timeout_minutes,
     })
 }
