@@ -14,7 +14,6 @@ yanked = "deny"
 [bans]
 multiple-versions = "warn"
 wildcards = "allow"
-deny = []
 skip = []
 
 [licenses]
@@ -32,7 +31,6 @@ allow = [
     "OpenSSL",
     "CC0-1.0",
 ]
-deny = []
 confidence-threshold = 0.8
 
 [[licenses.clarify]]

@@ -76,11 +76,19 @@ jobs:
         env:
           ADVISORY_DB_CACHE_DIR: /tmp/advisory-db
 
-      - name: Run cargo deny
-        uses: EmbarkStudios/cargo-deny-action@v1
+      - name: Cache cargo-deny binary
+        id: cache-cargo-deny
+        uses: actions/cache@v4
         with:
-          command: check bans licenses sources
-          arguments: --all-features
+          path: ~/.cargo/bin/cargo-deny
+          key: cargo-deny-bin-v1
+
+      - name: Install cargo-deny
+        if: steps.cache-cargo-deny.outputs.cache-hit != 'true'
+        run: cargo install cargo-deny --locked
+
+      - name: Run cargo deny
+        run: cargo deny check bans licenses sources --all-features
 
   docs:
     name: Docs
