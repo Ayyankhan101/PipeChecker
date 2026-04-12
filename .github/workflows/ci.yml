@@ -11,34 +11,19 @@ env:
   CARGO_INCREMENTAL: 0
   SCCACHE_VERSION: "0.8.0"
 
-# Cancel in-progress runs for the same branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ─────────────────────────────────────────────
-  # Reusable sccache setup (called via needs + outputs)
-  # GitHub Actions doesn't support true reusable steps, so we use a
-  # composite action pattern via a shared shell block in each job.
-  # ─────────────────────────────────────────────
-
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
-
-      - name: Install sccache
-        uses: ./.github/actions/sccache
-        with:
-          arch: x86_64-unknown-linux-musl
-        continue-on-error: true
-
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -48,10 +33,8 @@ jobs:
             ~/.cargo/git/db/
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-registry-
-
       - name: Clippy
         run: cargo clippy -- -D warnings
-
       - name: Formatting check
         run: cargo fmt -- --check
 
@@ -60,9 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -72,23 +53,19 @@ jobs:
             ~/.cargo/git/db/
           key: security-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: security-cargo-registry-
-
       - name: Cache cargo-audit binary
         id: cache-cargo-audit
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-audit
           key: cargo-audit-bin-v1
-
       - name: Install cargo-audit
         if: steps.cache-cargo-audit.outputs.cache-hit != 'true'
         run: cargo install cargo-audit --locked
-
       - name: Run security audit
         run: cargo audit
         env:
           ADVISORY_DB_CACHE_DIR: /tmp/advisory-db
-
       - name: Run cargo deny
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
@@ -99,9 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -111,7 +86,6 @@ jobs:
             ~/.cargo/git/db/
           key: docs-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: docs-cargo-registry-
-
       - name: Build documentation
         run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items
 
@@ -120,9 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -132,28 +104,23 @@ jobs:
             ~/.cargo/git/db/
           key: coverage-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: coverage-cargo-registry-
-
       - name: Cache cargo-tarpaulin binary
         id: cache-tarpaulin
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-tarpaulin
           key: cargo-tarpaulin-bin-v1
-
       - name: Install cargo-tarpaulin
         if: steps.cache-tarpaulin.outputs.cache-hit != 'true'
         run: cargo install cargo-tarpaulin --locked
-
       - name: Generate coverage report
         run: cargo tarpaulin --out Json --output-dir ./coverage --fail-under 60
-
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/
         continue-on-error: true
-
       - name: Generate summary
         run: |
           echo "## Code Coverage" >> $GITHUB_STEP_SUMMARY
@@ -167,10 +134,6 @@ jobs:
           print(f'**Coverage: {pct:.1f}%** ({covered}/{coverable} lines)')
           " >> $GITHUB_STEP_SUMMARY || echo "Coverage report generated" >> $GITHUB_STEP_SUMMARY
 
-  # ─────────────────────────────────────────────
-  # Test matrix — full (push to main) vs. reduced (pull request)
-  # ─────────────────────────────────────────────
-
   test:
     name: Test (${{ matrix.target }})
     needs: [lint, security, docs]
@@ -179,40 +142,33 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # ── Push to main: full matrix including ARM ──────────────────────
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             sccache-arch: x86_64-unknown-linux-musl
             run-on-pr: true
-
           - os: macos-latest
             target: aarch64-apple-darwin
             sccache-arch: aarch64-apple-darwin
             run-on-pr: true
-
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             sccache-arch: x86_64-pc-windows-msvc
             run-on-pr: true
-
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             sccache-arch: x86_64-unknown-linux-musl
             use-cross: true
-            run-on-pr: false   # cross-compile skipped on PRs
+            run-on-pr: false
 
-    # Skip non-PR entries when this is a pull_request event
     if: >
       github.event_name != 'pull_request' ||
       matrix.run-on-pr == true
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
       - name: Install sccache (Linux / macOS)
         if: runner.os != 'Windows'
         shell: bash
@@ -224,7 +180,6 @@ jobs:
           chmod +x "$CARGO_HOME/bin/sccache"
           echo "RUSTC_WRAPPER=$CARGO_HOME/bin/sccache" >> "$GITHUB_ENV"
           "$CARGO_HOME/bin/sccache" --start-server
-
       - name: Install sccache (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -237,16 +192,16 @@ jobs:
           Move-Item "sccache-v$env:SCCACHE_VERSION-${{ matrix.sccache-arch }}\sccache.exe" "$dest\sccache.exe"
           echo "RUSTC_WRAPPER=$dest\sccache.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
           & "$dest\sccache.exe" --start-server
-
       - name: Cache sccache storage
         uses: actions/cache@v4
         with:
-          path: ~/.cache/sccache
+          path: |
+            ~/.cache/sccache
+            ~\AppData\Local\cargo-sccache
           key: ${{ runner.os }}-sccache-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-sccache-${{ matrix.target }}-
             ${{ runner.os }}-sccache-
-
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -256,21 +211,18 @@ jobs:
             ~/.cargo/git/db/
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-registry-
-
       - name: Cache build artifacts
         uses: actions/cache@v4
         with:
           path: target
           key: ${{ runner.os }}-${{ matrix.target }}-target-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-${{ matrix.target }}-target-
-
       - name: Install cross
         if: matrix.use-cross == true
         run: |
           if ! command -v cross &>/dev/null; then
             cargo install cross --locked
           fi
-
       - name: Build
         shell: bash
         run: |
@@ -279,7 +231,6 @@ jobs:
           else
             cargo build --target ${{ matrix.target }}
           fi
-
       - name: Run tests
         shell: bash
         run: |
@@ -288,20 +239,14 @@ jobs:
           else
             cargo test --target ${{ matrix.target }}
           fi
-
       - name: Test CLI
         if: matrix.use-cross != true
         shell: bash
         run: |
           cargo run -- -- tests/fixtures/github/valid.yml
           cargo run -- tests/fixtures/github/circular.yml || true
-
       - name: Print sccache stats
         if: runner.os != 'Windows'
         shell: bash
         run: $CARGO_HOME/bin/sccache --show-stats
         continue-on-error: true
-      - name: Test CLI
-        run: |
-          cargo run -- -- tests/fixtures/github/valid.yml
-          cargo run -- tests/fixtures/github/circular.yml || true
