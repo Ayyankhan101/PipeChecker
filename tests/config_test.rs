@@ -6,7 +6,7 @@ use std::path::Path;
 fn test_config_file_loading() {
     let config_path = ".pipecheckerrc.yml";
     let backup_path = ".pipecheckerrc.yml.bak";
-    
+
     // Backup existing config if it exists
     if Path::new(config_path).exists() {
         fs::rename(config_path, backup_path).unwrap();
