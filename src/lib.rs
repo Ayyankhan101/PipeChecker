@@ -76,8 +76,15 @@ pub fn audit_content(content: &str, options: AuditOptions) -> Result<AuditResult
         issues.extend(auditors::secrets::audit(&pipeline)?);
     }
 
-    // Timeout auditor (always on — no config toggle yet)
-    issues.extend(auditors::timeout::audit(&pipeline)?);
+    // Timeout auditor — respect config toggle
+    if options
+        .rules
+        .as_ref()
+        .map(|r| r.timeout_validation)
+        .unwrap_or(true)
+    {
+        issues.extend(auditors::timeout::audit(&pipeline)?);
+    }
 
     if options.check_docker_images {
         // Pinning auditor — respect docker_latest_tag toggle

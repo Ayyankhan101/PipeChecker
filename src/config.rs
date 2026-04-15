@@ -38,6 +38,9 @@ pub struct Rules {
 
     #[serde(default = "default_true")]
     pub docker_latest_tag: bool,
+
+    #[serde(default = "default_true")]
+    pub timeout_validation: bool,
 }
 
 fn default_true() -> bool {
@@ -51,6 +54,7 @@ impl Default for Rules {
             circular_dependencies: true,
             missing_secrets: true,
             docker_latest_tag: true,
+            timeout_validation: true,
         }
     }
 }

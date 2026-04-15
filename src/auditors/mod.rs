@@ -14,9 +14,3 @@ pub mod timeout;
 
 #[cfg(feature = "network")]
 pub mod pinning;
-
-/// Backwards-compatible alias
-#[cfg(feature = "network")]
-pub mod docker {
-    pub use super::pinning::*;
-}

@@ -84,24 +84,51 @@ impl Pipeline {
 
     /// Find the line containing a job ID's key (e.g. job_id + ":" or job_id + "\n")
     pub fn find_job_line(&self, job_id: &str, key_hint: &str) -> (usize, usize) {
+        let mut job_line = 0;
+        let mut job_indent = 0;
+
         for (idx, line) in self.source.lines().enumerate() {
-            let trimmed = line.trim();
-            // Detect job block start: "  job_id:" (exact match or followed by whitespace)
+            let trimmed = line.trim_start();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+
+            // Detect job block start: "  job_id:"
             let prefix = format!("{}:", job_id);
             if trimmed.starts_with(&prefix) {
-                // Ensure we aren't matching a longer job name that merely starts with this prefix
                 let remainder = &trimmed[prefix.len()..];
                 if remainder.is_empty() || remainder.starts_with(char::is_whitespace) {
-                    let column = line.len() - line.trim_start().len() + 1;
+                    job_line = idx + 1;
+                    job_indent = line.len() - trimmed.len();
+                    break;
+                }
+            }
+        }
+
+        if job_line > 0 {
+            // Search for key_hint within the job block
+            for (idx, line) in self.source.lines().enumerate().skip(job_line) {
+                let trimmed = line.trim_start();
+                if trimmed.is_empty() || trimmed.starts_with('#') {
+                    continue;
+                }
+
+                let current_indent = line.len() - trimmed.len();
+                // If we've reached a line with the same or less indentation as the job ID, we've left the job block
+                if current_indent <= job_indent {
+                    break;
+                }
+
+                if trimmed.starts_with(&format!("{}:", key_hint)) {
+                    let column = current_indent + 1;
                     return (idx + 1, column);
                 }
             }
-            // Inside job block, look for the key
-            if trimmed.starts_with(&format!("{}:", key_hint)) {
-                let column = line.len() - line.trim_start().len() + 1;
-                return (idx + 1, column);
-            }
+            // If hint not found in block, return the job header line
+            let column = job_indent + 1;
+            return (job_line, column);
         }
+
         (0, 0)
     }
 }
@@ -314,8 +341,8 @@ mod tests {
     // --- Pipeline::find_job_line tests ---
 
     #[test]
-    fn test_pipeline_find_job_line_returns_job_header() {
-        // find_job_line first looks for "job_id:" and returns that line
+    fn test_pipeline_find_job_line_returns_hint_line() {
+        // find_job_line now finds the specific line of the key_hint within the job block
         let source = "jobs:\n  build:\n    runs-on: ubuntu\n    steps:";
         let pipeline = Pipeline {
             provider: Provider::GitHubActions,
@@ -325,15 +352,14 @@ mod tests {
         };
 
         let (line, col) = pipeline.find_job_line("build", "runs-on");
-        // Returns the job definition line (build:), not the hint line
-        assert_eq!(line, 2);
-        assert_eq!(col, 3);
+        // Returns the hint line (runs-on:), not the job header
+        assert_eq!(line, 3);
+        assert_eq!(col, 5);
     }
 
     #[test]
-    fn test_pipeline_find_job_line_similar_prefix_skipped() {
-        // "build-extra:" should not match when searching for "build:"
-        // But the key_hint "runs-on:" is found on line 3
+    fn test_pipeline_find_job_line_scoped_to_correct_job() {
+        // "build-extra:" has a "runs-on" but we want the one under "build:"
         let source = "jobs:\n  build-extra:\n    runs-on: ubuntu\n  build:\n    runs-on: ubuntu";
         let pipeline = Pipeline {
             provider: Provider::GitHubActions,
@@ -343,14 +369,13 @@ mod tests {
         };
 
         let (line, _col) = pipeline.find_job_line("build", "runs-on");
-        // "build-extra:" doesn't match, but "runs-on:" is found on line 3
-        // (key_hint search is independent, not scoped to the job block)
-        assert_eq!(line, 3);
+        // Should find the "runs-on" on line 5 (under "build:"), not line 3
+        assert_eq!(line, 5);
     }
 
     #[test]
-    fn test_pipeline_find_job_line_no_job_match_falls_back_to_hint() {
-        // When job_id isn't found, key_hint may still match elsewhere
+    fn test_pipeline_find_job_line_no_job_match_returns_zero() {
+        // When job_id isn't found, it should not leak hints from other jobs
         let source = "jobs:\n  build:\n    runs-on: ubuntu";
         let pipeline = Pipeline {
             provider: Provider::GitHubActions,
@@ -359,9 +384,9 @@ mod tests {
             source: source.to_string(),
         };
 
-        let (line, _col) = pipeline.find_job_line("deploy", "runs-on");
-        // key_hint "runs-on:" is still found
-        assert_eq!(line, 3);
+        let (line, col) = pipeline.find_job_line("deploy", "runs-on");
+        assert_eq!(line, 0);
+        assert_eq!(col, 0);
     }
 
     #[test]

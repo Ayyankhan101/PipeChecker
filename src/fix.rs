@@ -70,17 +70,23 @@ const KNOWN_DOCKER_IMAGES: &[(&str, &str)] = &[
 /// Returns the number of fixes applied and a description of each change.
 pub fn fix_file(path: &str) -> std::io::Result<FixResult> {
     let content = fs::read_to_string(path)?;
+    let has_trailing_newline = content.ends_with('\n');
     let result = fix_content(&content);
 
     if result.fixed > 0 {
         // Exclude warning messages from being written back to the file.
-        let cleaned: String = result
+        let mut cleaned: String = result
             .changes
             .iter()
             .filter(|line| !line.trim_start().starts_with("⚠️"))
             .cloned()
             .collect::<Vec<_>>()
             .join("\n");
+
+        if has_trailing_newline && !cleaned.ends_with('\n') {
+            cleaned.push('\n');
+        }
+
         fs::write(path, cleaned)?;
     }
 

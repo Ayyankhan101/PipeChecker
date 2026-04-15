@@ -43,13 +43,39 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
     let sccs = tarjan_scc(&graph);
     for scc in sccs {
         if scc.len() > 1 {
-            let job_names: Vec<_> = scc.iter().map(|&idx| graph[idx].clone()).collect();
-            // Find line of first job in the cycle for location
-            let first_job = &job_names[0];
+            // SCC is a cycle, let's find a specific path within it
+            let mut path = Vec::new();
+            let current = scc[0];
+            let scc_set: std::collections::HashSet<_> = scc.iter().cloned().collect();
+
+            path.push(graph[current].clone());
+
+            // Simple DFS to find a cycle path back to the start node
+            let mut temp_current = current;
+            for _ in 0..scc.len() {
+                if let Some(edge) = graph
+                    .neighbors(temp_current)
+                    .find(|neighbor| scc_set.contains(neighbor))
+                {
+                    path.push(graph[edge].clone());
+                    temp_current = edge;
+                    if edge == current {
+                        break;
+                    }
+                }
+            }
+
+            if path.first() != path.last() {
+                path.push(graph[current].clone());
+            }
+
+            let cycle_str = path.join(" -> ");
+            let first_job = &graph[current];
             let (line, col) = pipeline.find_job_line(first_job, "runs-on");
+
             issues.push(Issue::for_job(
                 Severity::Error,
-                &format!("Circular dependency detected: {}", job_names.join(" -> ")),
+                &format!("Circular dependency detected: {}", cycle_str),
                 first_job,
                 line,
                 col,

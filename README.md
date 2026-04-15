@@ -73,6 +73,16 @@ Every developer has been here:
 
 ---
 
+## Documentation
+
+Comprehensive documentation can be found in the [docs/](docs/index.md) folder:
+- [Start Here](docs/START_HERE.md)
+- [Complete Guide](docs/COMPLETE_GUIDE.md)
+- [TUI Guide](docs/TUI_GUIDE.md)
+- [Contributing](docs/CONTRIBUTING.md)
+
+---
+
 ## Supported Platforms
 
 | Platform | File Pattern | Status |
@@ -565,6 +575,6 @@ SPDX: MIT OR Apache-2.0
 
 **PipeChecker** — *because waiting 10 minutes for CI to tell you about a typo is nobody's idea of fun.*
 
-[Report a bug](https://github.com/Ayyankhan101/PipeCheck/issues) · [Request a feature](https://github.com/Ayyankhan101/PipeCheck/issues) · [Contributing](CONTRIBUTING.md)
+[Report a bug](https://github.com/Ayyankhan101/PipeCheck/issues) · [Request a feature](https://github.com/Ayyankhan101/PipeCheck/issues) · [Contributing](docs/CONTRIBUTING.md)
 
 </div>
