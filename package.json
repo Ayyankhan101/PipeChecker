@@ -1,6 +1,6 @@
 {
   "name": "pipechecker",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "CI/CD Pipeline Auditor - Catch errors before you push",
   "readme": "README.md",
   "bin": {

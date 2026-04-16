@@ -16,7 +16,7 @@ function getBinaryName() {
   const arch = process.arch;
   
   if (platform === 'win32') {
-    return `pipechecker-${arch}.exe`;
+    return `pipechecker-${arch}.exe/pipechecker.exe`;
   }
-  return `pipechecker-${platform}-${arch}`;
+  return `pipechecker-${platform}-${arch}/pipechecker`;
 }

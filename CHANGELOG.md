@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.8] - 2026-04-16
+
+### Fixed
+- **NPM wrapper binary path fix** — Fixed npm package to correctly locate the binary inside platform-specific folders. Users can now run `npm install pipechecker` and use it immediately without errors.
+
+### Changed
+- Updated `bin/pipechecker.js` to append `/pipechecker` suffix to binary path
+
+[0.2.8]: https://github.com/Ayyankhan101/PipeCheck/compare/v0.2.7...v0.2.8
+
 ## [0.2.7] - 2026-04-16
 
 ### Fixed
