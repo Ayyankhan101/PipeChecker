@@ -11,7 +11,7 @@ Welcome to the PipeChecker documentation hub. Here you can find comprehensive gu
 ## Project Information
 - [Project Summary](PROJECT_SUMMARY.md) - Overview of the project's goals and architecture.
 - [Improvements](IMPROVEMENTS.md) - Planned and suggested improvements.
-- [Feature Log (v0.2.4)](FEATURES_V0.2.4.md) - New features in the latest stable version.
+- [Feature Log (v0.2.7)](FEATURES_V0.2.7.md) - New features in the latest stable version.
 - [Feature Log (v0.2.0)](FEATURES_V0.2.0.md) - Features introduced in the v0.2.0 release.
 
 ## For Contributors & Maintainers

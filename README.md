@@ -5,7 +5,7 @@
 [![CI](https://github.com/Ayyankhan101/PipeChecker/actions/workflows/ci.yml/badge.svg)](https://github.com/Ayyankhan101/PipeChecker/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/pipechecker.svg)](https://crates.io/crates/pipechecker)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue)](LICENSE-MIT)
-[![Test Coverage](https://img.shields.io/badge/tests-103%20passing-brightgreen)]()
+[![Test Coverage](https://img.shields.io/badge/tests-134%20passing-brightgreen)]()
 [![Rust](https://img.shields.io/badge/rust-2021-orange)](Cargo.toml)
 
 ---
