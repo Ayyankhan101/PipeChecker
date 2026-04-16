@@ -22,8 +22,25 @@ pub fn parse(content: &str) -> Result<Pipeline> {
         crate::error::PipecheckError::InvalidPipeline("Expected YAML mapping".to_string())
     })?;
 
-    // Parse global env vars (from setup commands or environment key)
-    let env = Vec::new();
+    // Parse global env vars (from top-level environment key)
+    let mut env = Vec::new();
+    if let Some(env_val) = mapping.get("environment") {
+        if let Some(env_map) = env_val.as_mapping() {
+            for (k, v) in env_map {
+                if let Some(key) = k.as_str() {
+                    let value = match v {
+                        Value::String(s) => s.clone(),
+                        other => format!("{:?}", other),
+                    };
+                    env.push(EnvVar {
+                        key: key.to_string(),
+                        value,
+                        is_secret: false,
+                    });
+                }
+            }
+        }
+    }
 
     // Parse workflows to understand job ordering
     let mut workflow_deps: std::collections::HashMap<String, Vec<String>> =
@@ -108,6 +125,7 @@ fn parse_job(
     let mut steps = Vec::new();
     let mut env = Vec::new();
     let mut container_image: Option<String> = None;
+    let mut service_images: Vec<String> = Vec::new();
 
     // Parse executor (Docker image)
     if let Some(executor_val) = map.get("executor") {
@@ -123,9 +141,15 @@ fn parse_job(
 
     // Parse docker executor (inline)
     if let Some(Value::Sequence(docker_list)) = map.get("docker") {
-        if let Some(Value::Mapping(m)) = docker_list.first() {
-            if let Some(Value::String(s)) = m.get(Value::String("image".to_string())) {
-                container_image = Some(s.clone());
+        for (idx, docker_entry) in docker_list.iter().enumerate() {
+            if let Value::Mapping(m) = docker_entry {
+                if let Some(Value::String(s)) = m.get(Value::String("image".to_string())) {
+                    if idx == 0 {
+                        container_image = Some(s.clone());
+                    } else {
+                        service_images.push(s.clone());
+                    }
+                }
             }
         }
     }
@@ -241,7 +265,7 @@ fn parse_job(
         steps,
         env,
         container_image,
-        service_images: Vec::new(),
+        service_images,
         timeout_minutes,
     })
 }

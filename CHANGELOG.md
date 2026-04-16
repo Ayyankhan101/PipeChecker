@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.4] - 2026-04-12
+## [0.2.7] - 2026-04-16
+
+### Fixed
+- **CircleCI global env vars now parsed** — secrets auditor now detects hardcoded secrets in CircleCI `environment:` top-level config
+- **CircleCI service images now parsed** — Docker `:latest` tag checks now work for CircleCI services defined in job `docker:` entries
+
+### Changed
+- CircleCI parser now correctly extracts service images from multiple docker entries (2nd, 3rd, etc. images treated as services)
+
+[0.2.7]: https://github.com/Ayyankhan101/PipeCheck/compare/v0.2.6...v0.2.7
+
+## [0.2.6] - 2026-04-15
 
 ### Added
 - **Timing metrics** — every audit now shows `⏱️ Checked in Xms` so you can see how fast PipeChecker is
