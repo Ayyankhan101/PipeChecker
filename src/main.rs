@@ -7,6 +7,50 @@ use std::{
     time::{Duration, Instant},
 };
 
+fn init_from_template(template: Option<String>, force: bool) {
+    let tmpl = template.unwrap_or_else(|| {
+        eprintln!("Please specify a template: --init --template <node|rust|docker|gitlab-node>");
+        process::exit(1);
+    });
+
+    let templates = [
+        ("node", "node.yml"),
+        ("rust", "rust.yml"),
+        ("docker", "docker.yml"),
+        ("gitlab-node", "gitlab-node.yml"),
+    ];
+
+    let (name, file) = templates
+        .iter()
+        .find(|(n, _)| *n == tmpl)
+        .map(|(_, f)| (tmpl.as_str(), *f))
+        .unwrap_or_else(|| {
+            eprintln!("Unknown template: {}", tmpl);
+            eprintln!("Available: node, rust, docker, gitlab-node");
+            process::exit(1);
+        });
+
+    let src = Path::new("templates").join(file);
+    let dest = if name == "gitlab-node" {
+        Path::new(".gitlab-ci.yml").to_path_buf()
+    } else {
+        Path::new(".github/workflows").join(file)
+    };
+
+    if dest.exists() && !force {
+        eprintln!("File {} already exists. Use --init to overwrite.", dest.display());
+        process::exit(1);
+    }
+
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).ok();
+    }
+    fs::copy(&src, &dest).ok();
+
+    println!("✅ Created {} from template '{}'", dest.display(), name);
+    println!("   Run 'pipechecker {}' to validate", dest.display());
+}
+
 /// Auto-detect a single workflow file from common patterns.
 /// Uses `discover_workflows` under the hood, then prefers known filenames.
 fn auto_detect_workflow() -> String {
@@ -120,10 +164,27 @@ struct Cli {
     /// Base branch for diff mode
     #[arg(long, default_value = "main")]
     diff_branch: String,
+
+    /// Initialize a new workflow from template
+    #[arg(long)]
+    init: bool,
+
+    /// Template name (node, rust, docker, gitlab-node)
+    #[arg(long, requires = "init")]
+    template: Option<String>,
+
+    /// Force overwrite existing files
+    #[arg(long, requires = "init")]
+    force: bool,
 }
 
 fn main() {
     let cli = Cli::parse();
+
+    if cli.init {
+        init_from_template(cli.template, cli.force);
+        return;
+    }
 
     if cli.install_hook {
         install_git_hook();
