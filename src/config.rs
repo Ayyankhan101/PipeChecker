@@ -28,7 +28,7 @@ pub struct Config {
 }
 
 /// Rule configuration toggling individual audit checks on or off.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Rules {
     #[serde(default = "default_true")]
     pub circular_dependencies: bool,

@@ -43,6 +43,29 @@ fn auto_detect_workflow() -> String {
     process::exit(1)
 }
 
+/// Get workflow files changed since the given base branch
+fn get_changed_workflows(base_branch: &str) -> Vec<String> {
+    let output = std::process::Command::new("git")
+        .args(["diff", "--name-only", &format!("{}...", base_branch)])
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => {
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .filter(|f| {
+                    f.contains(".github/workflows")
+                        || f.contains(".gitlab-ci")
+                        || f.contains(".circleci")
+                })
+                .filter(|f| f.ends_with(".yml") || f.ends_with(".yaml"))
+                .map(String::from)
+                .collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "pipechecker")]
 #[command(version)]
@@ -91,6 +114,14 @@ struct Cli {
     /// Verbose mode — show detailed diagnostic information
     #[arg(long)]
     verbose: bool,
+
+    /// Check only files changed since base branch
+    #[arg(short, long)]
+    diff: bool,
+
+    /// Base branch for diff mode
+    #[arg(long, default_value = "main")]
+    diff_branch: String,
 }
 
 fn main() {
@@ -152,6 +183,69 @@ fn main() {
         strict_mode: cli.strict,
         rules: Some(load_config().rules),
     };
+
+    if cli.diff {
+        let changed_files = get_changed_workflows(&cli.diff_branch);
+        if changed_files.is_empty() {
+            println!("No workflow files changed since {}", cli.diff_branch);
+            return;
+        }
+        println!(
+            "📁 Checking {} file(s) changed since {}...\n",
+            changed_files.len(),
+            cli.diff_branch
+        );
+        let mut has_error = false;
+        for file in &changed_files {
+            if cli.verbose {
+                eprintln!("📄 Auditing: {}", file);
+            }
+            match audit_file(file, options) {
+                Ok(result) => {
+                    let file_has_errors = result
+                        .issues
+                        .iter()
+                        .any(|i| i.severity == pipechecker::Severity::Error);
+                    has_error = has_error || file_has_errors;
+                    if file_has_errors || (cli.strict && !result.issues.is_empty()) {
+                        for issue in &result.issues {
+                            if cli.quiet && issue.severity != pipechecker::Severity::Error {
+                                continue;
+                            }
+                            let prefix = match issue.severity {
+                                pipechecker::Severity::Error => "❌ ERROR",
+                                pipechecker::Severity::Warning => "⚠️  WARNING",
+                                pipechecker::Severity::Info => "ℹ️  INFO",
+                            };
+                            print!("{}: {}", prefix, issue.message);
+                            if let Some(loc) = &issue.location {
+                                if let Some(job) = &loc.job {
+                                    print!(" (job: {})", job);
+                                }
+                                if loc.line > 0 {
+                                    print!(" [line {}]", loc.line);
+                                }
+                            }
+                            println!();
+                            if let Some(suggestion) = &issue.suggestion {
+                                println!("   💡 {}", suggestion);
+                            }
+                            println!();
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    has_error = true;
+                }
+            }
+        }
+        if has_error {
+            process::exit(1);
+        }
+        println!("✅ All changed workflows valid!");
+        return;
+    }
 
     if cli.all {
         audit_all_workflows(options, &cli.format, cli.strict, cli.quiet, cli.verbose);
@@ -319,6 +413,69 @@ fn watch_mode(cli: &Cli) {
         strict_mode: cli.strict,
         rules: Some(load_config().rules),
     };
+
+    if cli.diff {
+        let changed_files = get_changed_workflows(&cli.diff_branch);
+        if changed_files.is_empty() {
+            println!("No workflow files changed since {}", cli.diff_branch);
+            return;
+        }
+        println!(
+            "📁 Checking {} file(s) changed since {}...\n",
+            changed_files.len(),
+            cli.diff_branch
+        );
+        let mut has_error = false;
+        for file in &changed_files {
+            if cli.verbose {
+                eprintln!("📄 Auditing: {}", file);
+            }
+            match audit_file(file, options) {
+                Ok(result) => {
+                    let file_has_errors = result
+                        .issues
+                        .iter()
+                        .any(|i| i.severity == pipechecker::Severity::Error);
+                    has_error = has_error || file_has_errors;
+                    if file_has_errors || (cli.strict && !result.issues.is_empty()) {
+                        for issue in &result.issues {
+                            if cli.quiet && issue.severity != pipechecker::Severity::Error {
+                                continue;
+                            }
+                            let prefix = match issue.severity {
+                                pipechecker::Severity::Error => "❌ ERROR",
+                                pipechecker::Severity::Warning => "⚠️  WARNING",
+                                pipechecker::Severity::Info => "ℹ️  INFO",
+                            };
+                            print!("{}: {}", prefix, issue.message);
+                            if let Some(loc) = &issue.location {
+                                if let Some(job) = &loc.job {
+                                    print!(" (job: {})", job);
+                                }
+                                if loc.line > 0 {
+                                    print!(" [line {}]", loc.line);
+                                }
+                            }
+                            println!();
+                            if let Some(suggestion) = &issue.suggestion {
+                                println!("   💡 {}", suggestion);
+                            }
+                            println!();
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    has_error = true;
+                }
+            }
+        }
+        if has_error {
+            process::exit(1);
+        }
+        println!("✅ All changed workflows valid!");
+        return;
+    }
 
     if cli.all {
         audit_all_workflows(options, &cli.format, cli.strict, cli.quiet, cli.verbose);

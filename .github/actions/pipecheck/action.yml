@@ -1,0 +1,61 @@
+name: 'PipeChecker'
+description: 'Validate CI/CD pipelines before you push — catch errors locally'
+author: 'Pipecheck Contributors'
+inputs:
+  strict:
+    description: 'Exit with error on warnings'
+    required: false
+    default: 'false'
+  path:
+    description: 'Path to workflow file(s)'
+    required: false
+    default: '.github/workflows'
+  fail-on-warning:
+    description: 'Treat warnings as errors'
+    required: false
+    default: 'false'
+  diff:
+    description: 'Check only files changed since base branch'
+    required: false
+    default: 'false'
+  diff-branch:
+    description: 'Base branch for diff mode'
+    required: false
+    default: 'main'
+  args:
+    description: 'Additional arguments to pass to pipechecker'
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install PipeChecker
+      shell: bash
+      run: |
+        cargo install pipechecker
+
+    - name: Run PipeChecker
+      shell: bash
+      run: |
+        set -e
+        ARGS="${{ inputs.args }}"
+        
+        if [ "${{ inputs.strict }}" = "true" ]; then
+          ARGS="$ARGS --strict"
+        fi
+        
+        if [ "${{ inputs.diff }}" = "true" ]; then
+          ARGS="$ARGS --diff"
+          if [ -n "${{ inputs.diff-branch }}" ]; then
+            ARGS="$ARGS --diff-branch ${{ inputs.diff-branch }}"
+          fi
+        fi
+        
+        if [ "${{ inputs.fail-on-warning }}" = "true" ]; then
+          ARGS="$ARGS --strict"
+        fi
+        
+        pipechecker ${{ inputs.path }} $ARGS

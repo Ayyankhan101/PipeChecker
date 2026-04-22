@@ -114,6 +114,49 @@ npm install -g pipechecker
 
 ---
 
+## GitHub Action
+
+PipeChecker can be used directly in your GitHub workflows:
+
+```yaml
+name: CI Pipeline Check
+on: [push, pull_request]
+
+jobs:
+  pipechecker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Ayyankhan101/PipeCheck/actions/pipecheck@v0.2.9
+```
+
+### Action Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `path` | No | `.github/workflows` | Path to workflow file(s) |
+| `strict` | No | `false` | Exit with error on warnings |
+| `diff` | No | `false` | Check only changed files |
+| `diff-branch` | No | `main` | Base branch for diff mode |
+
+---
+
+## Diff Mode
+
+Check only workflow files that changed since a base branch:
+
+```bash
+# Check files changed since main
+pipechecker --diff --diff-branch main
+
+# Short form
+pipechecker -d
+```
+
+This uses `git diff --name-only` to find changed workflow files, then checks only those. Faster in monorepos with many workflows.
+
+---
+
 ## Quick Start
 
 ### 1. Check a single file

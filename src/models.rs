@@ -133,7 +133,7 @@ impl Pipeline {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct AuditOptions {
     pub check_docker_images: bool,
     pub strict_mode: bool,
