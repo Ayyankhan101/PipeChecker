@@ -556,7 +556,7 @@ fn audit_all_workflows(
         let opts = AuditOptions {
             check_docker_images: options.check_docker_images,
             strict_mode: options.strict_mode,
-            rules: options.rules.clone(),
+            rules: options.rules,
         };
         match audit_file(file, opts) {
             Ok(result) => {
