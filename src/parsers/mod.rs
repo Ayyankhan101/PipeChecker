@@ -31,13 +31,12 @@ pub fn detect_provider(content: &str) -> Result<Provider> {
         }
 
         // GitLab CI
-        if map.contains_key("stages")
+        if (map.contains_key("stages")
             || map.contains_key("image")
-            || map.contains_key("before_script")
+            || map.contains_key("before_script"))
+            && !map.contains_key("on") && !map.contains_key("workflows")
         {
-            if !map.contains_key("on") && !map.contains_key("workflows") {
-                return Ok(Provider::GitLabCI);
-            }
+            return Ok(Provider::GitLabCI);
         }
 
         // CircleCI: 'version' and ('workflows' or 'jobs')
