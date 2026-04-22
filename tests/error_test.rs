@@ -8,7 +8,7 @@ use std::io;
 fn test_error_unknown_provider() {
     let yaml = "not: a pipeline";
     let result = audit_content(yaml, AuditOptions::default());
-    
+
     match result {
         Err(PipecheckError::UnknownProvider(_)) => (),
         _ => panic!("Expected UnknownProvider error, got {:?}", result),
@@ -27,7 +27,7 @@ fn test_error_invalid_pipeline() {
 fn test_error_io_conversion() {
     let io_err = io::Error::new(io::ErrorKind::NotFound, "file missing");
     let pipe_err: PipecheckError = io_err.into();
-    
+
     match pipe_err {
         PipecheckError::IoError(_) => (),
         _ => panic!("Expected IoError, got {:?}", pipe_err),
@@ -38,7 +38,7 @@ fn test_error_io_conversion() {
 fn test_error_yaml_conversion() {
     let yaml_err = serde_yaml::from_str::<serde_yaml::Value>(": invalid").unwrap_err();
     let pipe_err: PipecheckError = yaml_err.into();
-    
+
     match pipe_err {
         PipecheckError::YamlError(_) => (),
         _ => panic!("Expected YamlError, got {:?}", pipe_err),
@@ -62,6 +62,6 @@ fn test_result_type_alias() {
     fn produces_error() -> Result<()> {
         Err(PipecheckError::InvalidPipeline("test".to_string()))
     }
-    
+
     assert!(produces_error().is_err());
 }

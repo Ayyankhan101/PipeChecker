@@ -320,7 +320,10 @@ mod tests {
 
     #[test]
     fn test_base64_like_detected() {
-        assert!(is_potential_secret("var", "abcDEF123+/xyzABC456===GHJklmno789pqrSTUV"));
+        assert!(is_potential_secret(
+            "var",
+            "abcDEF123+/xyzABC456===GHJklmno789pqrSTUV"
+        ));
     }
 
     #[test]
@@ -332,7 +335,10 @@ mod tests {
     #[test]
     fn test_values_with_special_chars_not_long_enough() {
         // Contains spaces, so not all alphanumeric
-        assert!(!is_potential_secret("run", "hello world this is a test string"));
+        assert!(!is_potential_secret(
+            "run",
+            "hello world this is a test string"
+        ));
     }
 
     #[test]

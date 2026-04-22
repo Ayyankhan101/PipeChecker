@@ -293,7 +293,9 @@ fn test_pinning_detects_docker_container_no_tag() {
     let pipeline = make_pipeline(jobs);
 
     let issues = pinning::audit(&pipeline).unwrap();
-    assert!(issues.iter().any(|i| i.message.contains("without explicit tag")));
+    assert!(issues
+        .iter()
+        .any(|i| i.message.contains("without explicit tag")));
 }
 
 #[test]
@@ -312,7 +314,9 @@ fn test_pinning_detects_service_image_latest() {
     let pipeline = make_pipeline(jobs);
 
     let issues = pinning::audit(&pipeline).unwrap();
-    assert!(issues.iter().any(|i| i.message.contains("services: postgres:latest")));
+    assert!(issues
+        .iter()
+        .any(|i| i.message.contains("services: postgres:latest")));
 }
 
 #[test]
@@ -331,7 +335,9 @@ fn test_pinning_detects_service_image_no_tag() {
     let pipeline = make_pipeline(jobs);
 
     let issues = pinning::audit(&pipeline).unwrap();
-    assert!(issues.iter().any(|i| i.message.contains("without explicit tag")));
+    assert!(issues
+        .iter()
+        .any(|i| i.message.contains("without explicit tag")));
 }
 
 #[test]

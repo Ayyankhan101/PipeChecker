@@ -99,7 +99,6 @@ pub fn parse(content: &str) -> Result<Pipeline> {
         }
     }
 
-
     Ok(Pipeline {
         provider: Provider::GitLabCI,
         jobs,

@@ -1,16 +1,16 @@
 //! Tests for CLI main function and flags
 
 use std::fs;
+use std::os::unix::fs as unix_fs;
 use std::path::Path;
 use std::process::Command;
-use std::os::unix::fs as unix_fs;
 
 fn setup_template_test() {
     let dir = Path::new("templates");
     if !dir.exists() {
         fs::create_dir_all(dir).ok();
     }
-    
+
     let content = r#"name: Test CI
 on: push
 jobs:
@@ -28,16 +28,16 @@ jobs:
 #[test]
 fn test_init_template_creates_file() {
     setup_template_test();
-    
+
     let output = Command::new("cargo")
         .args(["run", "--", "--init", "--template", "node"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
-    
+
     let result = String::from_utf8_lossy(&output.stdout);
     assert!(result.contains("Created") || output.status.success());
-    
+
     // Cleanup
     fs::remove_file(".github/workflows/node.yml").ok();
 }
@@ -45,16 +45,16 @@ fn test_init_template_creates_file() {
 #[test]
 fn test_init_template_rust() {
     setup_template_test();
-    
+
     let output = Command::new("cargo")
         .args(["run", "--", "--init", "--template", "rust"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
-    
+
     let result = String::from_utf8_lossy(&output.stdout);
     assert!(result.contains("Created") || output.status.success());
-    
+
     // Cleanup
     fs::remove_file(".github/workflows/rust.yml").ok();
 }
@@ -62,13 +62,13 @@ fn test_init_template_rust() {
 #[test]
 fn test_init_template_unknown() {
     setup_template_test();
-    
+
     let output = Command::new("cargo")
         .args(["run", "--", "--init", "--template", "invalid"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
-    
+
     assert!(!output.status.success());
 }
 
@@ -79,7 +79,7 @@ fn test_diff_branch_default() {
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
-    
+
     let result = String::from_utf8_lossy(&output.stdout);
     assert!(result.contains("--diff-branch"));
 }
@@ -91,7 +91,7 @@ fn test_help_shows_diff() {
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
-    
+
     let result = String::from_utf8_lossy(&output.stdout);
     assert!(result.contains("--diff"));
     assert!(result.contains("--init"));
@@ -105,7 +105,7 @@ fn test_quiet_mode() {
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
-    
+
     // Should complete without error even with warnings
     assert!(output.status.success() || !output.status.success());
 }
@@ -117,7 +117,7 @@ fn test_strict_mode() {
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
-    
+
     // In strict mode, warnings cause failure
     // This test just verifies the flag works
     assert!(output.status.success() || !output.status.success());
@@ -130,7 +130,7 @@ fn test_json_format() {
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
-    
+
     let result = String::from_utf8_lossy(&output.stdout);
     assert!(result.starts_with("{") || result.contains("provider"));
 }
@@ -142,7 +142,7 @@ fn test_verbose_mode() {
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
-    
+
     let result = String::from_utf8_lossy(&output.stderr);
     assert!(result.contains("Auditing") || result.contains("Checked"));
 }
@@ -150,11 +150,16 @@ fn test_verbose_mode() {
 #[test]
 fn test_no_pinning_flag() {
     let output = Command::new("cargo")
-        .args(["run", "--", "--no-pinning", "tests/fixtures/github/valid.yml"])
+        .args([
+            "run",
+            "--",
+            "--no-pinning",
+            "tests/fixtures/github/valid.yml",
+        ])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
-    
+
     // Just verify flag is accepted
     assert!(output.status.success() || !output.status.success());
 }

@@ -34,7 +34,8 @@ pub fn detect_provider(content: &str) -> Result<Provider> {
         if (map.contains_key("stages")
             || map.contains_key("image")
             || map.contains_key("before_script"))
-            && !map.contains_key("on") && !map.contains_key("workflows")
+            && !map.contains_key("on")
+            && !map.contains_key("workflows")
         {
             return Ok(Provider::GitLabCI);
         }

@@ -38,7 +38,10 @@ fn init_from_template(template: Option<String>, force: bool) {
     };
 
     if dest.exists() && !force {
-        eprintln!("File {} already exists. Use --init to overwrite.", dest.display());
+        eprintln!(
+            "File {} already exists. Use --init to overwrite.",
+            dest.display()
+        );
         process::exit(1);
     }
 

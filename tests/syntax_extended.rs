@@ -61,17 +61,17 @@ fn test_syntax_long_job_id() {
 fn test_syntax_many_dependencies() {
     let mut jobs = Vec::new();
     let mut needs = Vec::new();
-    
+
     // Create 20 prerequisite jobs
     for i in 0..20 {
         let id = format!("pre-{}", i);
         jobs.push(create_test_job(&id, vec![]));
         needs.push(id);
     }
-    
+
     // One job depending on all of them
     jobs.push(create_test_job("final-job", needs));
-    
+
     let pipeline = make_pipeline(jobs);
     let issues = syntax::audit(&pipeline).unwrap();
     assert!(issues.is_empty());
@@ -84,7 +84,7 @@ fn test_syntax_job_id_with_special_chars() {
     for id in special_ids {
         jobs.push(create_test_job(id, vec![]));
     }
-    
+
     let pipeline = make_pipeline(jobs);
     let issues = syntax::audit(&pipeline).unwrap();
     assert!(issues.is_empty());
@@ -96,9 +96,14 @@ fn test_syntax_missing_dependency_reported_as_error() {
     let pipeline = make_pipeline(jobs);
 
     let issues = syntax::audit(&pipeline).unwrap();
-    let errors: Vec<_> = issues.iter().filter(|i| i.severity == Severity::Error).collect();
+    let errors: Vec<_> = issues
+        .iter()
+        .filter(|i| i.severity == Severity::Error)
+        .collect();
     assert_eq!(errors.len(), 1);
-    assert!(errors[0].message.contains("depends on non-existent job 'missing-job'"));
+    assert!(errors[0]
+        .message
+        .contains("depends on non-existent job 'missing-job'"));
 }
 
 #[test]
@@ -112,7 +117,10 @@ fn test_syntax_multiple_duplicate_job_ids() {
     let pipeline = make_pipeline(jobs);
 
     let issues = syntax::audit(&pipeline).unwrap();
-    let duplicates: Vec<_> = issues.iter().filter(|i| i.message.contains("Duplicate job ID")).collect();
+    let duplicates: Vec<_> = issues
+        .iter()
+        .filter(|i| i.message.contains("Duplicate job ID"))
+        .collect();
     // It reports each duplicate once it finds it again
     assert_eq!(duplicates.len(), 2);
 }
