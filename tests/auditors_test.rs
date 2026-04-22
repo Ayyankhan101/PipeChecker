@@ -278,6 +278,84 @@ fn test_pinning_detects_docker_container_latest() {
 }
 
 #[test]
+#[cfg(feature = "network")]
+fn test_pinning_detects_docker_container_no_tag() {
+    let jobs = vec![Job {
+        id: "web".to_string(),
+        name: None,
+        depends_on: vec![],
+        steps: vec![],
+        env: vec![],
+        container_image: Some("nginx".to_string()),
+        service_images: vec![],
+        timeout_minutes: None,
+    }];
+    let pipeline = make_pipeline(jobs);
+
+    let issues = pinning::audit(&pipeline).unwrap();
+    assert!(issues.iter().any(|i| i.message.contains("without explicit tag")));
+}
+
+#[test]
+#[cfg(feature = "network")]
+fn test_pinning_detects_service_image_latest() {
+    let jobs = vec![Job {
+        id: "web".to_string(),
+        name: None,
+        depends_on: vec![],
+        steps: vec![],
+        env: vec![],
+        container_image: Some("nginx:1.25".to_string()),
+        service_images: vec!["postgres:latest".to_string()],
+        timeout_minutes: None,
+    }];
+    let pipeline = make_pipeline(jobs);
+
+    let issues = pinning::audit(&pipeline).unwrap();
+    assert!(issues.iter().any(|i| i.message.contains("services: postgres:latest")));
+}
+
+#[test]
+#[cfg(feature = "network")]
+fn test_pinning_detects_service_image_no_tag() {
+    let jobs = vec![Job {
+        id: "web".to_string(),
+        name: None,
+        depends_on: vec![],
+        steps: vec![],
+        env: vec![],
+        container_image: Some("nginx:1.25".to_string()),
+        service_images: vec!["redis".to_string()],
+        timeout_minutes: None,
+    }];
+    let pipeline = make_pipeline(jobs);
+
+    let issues = pinning::audit(&pipeline).unwrap();
+    assert!(issues.iter().any(|i| i.message.contains("without explicit tag")));
+}
+
+#[test]
+#[cfg(feature = "network")]
+fn test_pinning_detects_multiple_issues_in_one_job() {
+    let steps = vec![create_test_step("checkout", Some("actions/checkout"), None)];
+    let jobs = vec![Job {
+        id: "web".to_string(),
+        name: None,
+        depends_on: vec![],
+        steps,
+        env: vec![],
+        container_image: Some("nginx:latest".to_string()),
+        service_images: vec!["redis".to_string()],
+        timeout_minutes: None,
+    }];
+    let pipeline = make_pipeline(jobs);
+
+    let issues = pinning::audit(&pipeline).unwrap();
+    // 1 for container, 1 for service, 1 for step action
+    assert_eq!(issues.len(), 3);
+}
+
+#[test]
 fn test_secrets_catches_with_inputs() {
     let with_val = serde_yaml::from_str("token: ${{ secrets.DEPLOY_KEY }}").unwrap();
     let steps = vec![Step {

@@ -42,7 +42,15 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
     // Detect cycles using Tarjan's algorithm
     let sccs = tarjan_scc(&graph);
     for scc in sccs {
-        if scc.len() > 1 {
+        let is_cycle = if scc.len() > 1 {
+            true
+        } else {
+            // Check for self-loop
+            let node_idx = scc[0];
+            graph.neighbors(node_idx).any(|n| n == node_idx)
+        };
+
+        if is_cycle {
             // SCC is a cycle, let's find a specific path within it
             let mut path = Vec::new();
             let current = scc[0];
@@ -50,17 +58,22 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
 
             path.push(graph[current].clone());
 
-            // Simple DFS to find a cycle path back to the start node
-            let mut temp_current = current;
-            for _ in 0..scc.len() {
-                if let Some(edge) = graph
-                    .neighbors(temp_current)
-                    .find(|neighbor| scc_set.contains(neighbor))
-                {
-                    path.push(graph[edge].clone());
-                    temp_current = edge;
-                    if edge == current {
-                        break;
+            // If it's a self-loop, path is simple
+            if scc.len() == 1 {
+                path.push(graph[current].clone());
+            } else {
+                // Simple DFS to find a cycle path back to the start node
+                let mut temp_current = current;
+                for _ in 0..scc.len() {
+                    if let Some(edge) = graph
+                        .neighbors(temp_current)
+                        .find(|neighbor| scc_set.contains(neighbor))
+                    {
+                        path.push(graph[edge].clone());
+                        temp_current = edge;
+                        if edge == current {
+                            break;
+                        }
                     }
                 }
             }

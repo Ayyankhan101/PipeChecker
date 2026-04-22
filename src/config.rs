@@ -88,7 +88,7 @@ impl Config {
     pub fn should_ignore(&self, file: &str) -> bool {
         self.ignore.iter().any(|pattern| {
             if pattern.contains('*') {
-                let re = pattern.replace("*", ".*");
+                let re = format!("^{}$", pattern.replace("*", ".*"));
                 regex::Regex::new(&re)
                     .map(|r| r.is_match(file))
                     .unwrap_or(false)

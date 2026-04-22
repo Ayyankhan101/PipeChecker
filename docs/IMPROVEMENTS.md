@@ -6,54 +6,27 @@
 **Before:** `pipecheck .github/workflows/ci.yml`  
 **Now:** `pipecheck` (auto-detects!)
 
-The tool now automatically finds and checks:
-- `.github/workflows/ci.yml`
-- `.github/workflows/main.yml`
-- `.gitlab-ci.yml`
-- `.circleci/config.yml`
-
 ### 2. **Check All Workflows at Once**
 **New:** `pipecheck --all`
 
-Checks all workflow files in your project and shows a summary:
-```
-Checking 3 workflow file(s)...
+### 3. **Better Error Messages with Suggestions**
+**New:** Show the exact cycle with line numbers and actionable fix suggestions.
+DAG auditor now correctly handles self-loops and complex cycles with detailed path reporting.
 
-📄 .github/workflows/ci.yml
-   ✅ No issues found
+### 4. **Template Library**
+**New:** `pipecheck init --template node`
 
-📄 .github/workflows/release.yml
-   ❌ 1 error
-   
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Total: 1 errors, 0 warnings across 3 files
-```
+Quick-start with best-practice templates:
+- Node.js CI/CD
+- Rust CI/CD
+- Docker build & deploy
+- GitLab CI templates
 
 ---
 
 ## 🎯 HIGH-PRIORITY IMPROVEMENTS
 
-### 3. **Better Error Messages with Suggestions**
-**Current:** "Circular dependency detected"  
-**Better:** Show the exact cycle with line numbers and how to fix it
-
-```rust
-// Add to src/auditors/dag.rs
-fn format_cycle_error(cycle: &[String]) -> String {
-    format!(
-        "Circular dependency: {}\n\
-         \n\
-         To fix:\n\
-         1. Remove 'needs: {}' from job '{}'\n\
-         2. Or restructure your workflow dependencies",
-        cycle.join(" → "),
-        cycle.last().unwrap(),
-        cycle.first().unwrap()
-    )
-}
-```
-
-### 4. **Watch Mode for Development**
+### 5. **Watch Mode for Development**
 **New:** `pipecheck --watch`
 
 Auto-recheck when files change (great for development):
@@ -65,7 +38,7 @@ pipecheck --watch
 # ❌ ERROR: Circular dependency detected
 ```
 
-### 5. **Fix Command (Auto-fix Simple Issues)**
+### 6. **Fix Command (Auto-fix Simple Issues)**
 **New:** `pipecheck --fix`
 
 Automatically fix common issues:
@@ -74,7 +47,7 @@ Automatically fix common issues:
 - Fix indentation
 - Update deprecated syntax
 
-### 6. **Pre-commit Hook Integration**
+### 7. **Pre-commit Hook Integration**
 **New:** `pipecheck --install-hook`
 
 One command to add pre-commit hook:
@@ -84,7 +57,7 @@ pipecheck --install-hook
 # Pipecheck will run before every commit
 ```
 
-### 7. **Configuration File Support**
+### 8. **Configuration File Support**
 **New:** `.pipecheckrc.yml`
 
 ```yaml
@@ -103,14 +76,14 @@ custom-rules:
     level: warning
 ```
 
-### 8. **Better Docker Validation**
+### 9. **Better Docker Validation**
 Currently basic. Improve to:
 - Warn about `:latest` tags
 - Check if image exists (optional, requires network)
 - Suggest specific versions
 - Detect security vulnerabilities in images
 
-### 9. **Performance Metrics**
+### 10. **Performance Metrics**
 Show how much time/money saved:
 ```
 ✓ All checks passed in 0.3s
@@ -121,7 +94,7 @@ Show how much time/money saved:
    - Cost: ~$0.08 saved (GitHub Actions pricing)
 ```
 
-### 10. **IDE Integration**
+### 11. **IDE Integration**
 Create extensions for:
 - VS Code
 - JetBrains IDEs

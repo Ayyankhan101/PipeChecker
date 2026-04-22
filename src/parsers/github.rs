@@ -62,7 +62,15 @@ pub fn parse(content: &str) -> Result<Pipeline> {
                 if let Some(container_map) = v.as_mapping() {
                     container_map
                         .get(Value::String("image".into()))
-                        .and_then(|v| v.as_str().map(String::from))
+                        .and_then(|v| {
+                            if let Some(image_map) = v.as_mapping() {
+                                image_map
+                                    .get(Value::String("name".into()))
+                                    .and_then(|v| v.as_str().map(String::from))
+                            } else {
+                                v.as_str().map(String::from)
+                            }
+                        })
                 } else {
                     v.as_str().map(String::from)
                 }

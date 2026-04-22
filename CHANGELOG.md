@@ -11,9 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Template Library** — New `--init --template` flag to initialize workflows from pre-built templates.
 - Templates: `node`, `rust`, `docker`, `gitlab-node`
 - Usage: `pipechecker --init --template rust`
+- **Self-loop detection** — DAG auditor now correctly detects and reports jobs that depend on themselves.
+- **Enhanced Secret Detection** — Secrets auditor now analyzes environment variable keys (e.g., `API_KEY`, `PASSWORD`) in addition to values.
 
 ### Changed
 - Bumped version to 0.2.10
+- Improved cycle detection path reporting for complex dependency graphs.
 
 [0.2.10]: https://github.com/Ayyankhan101/PipeCheck/compare/v0.2.9...v0.2.10
 

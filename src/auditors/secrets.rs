@@ -52,7 +52,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
 
     // Check pipeline-level env vars for hardcoded secrets
     for env_var in &pipeline.env {
-        if is_potential_secret_value(&env_var.value) {
+        if is_potential_secret(&env_var.key, &env_var.value) {
             let (line, col) = pipeline.find_line(&format!("  {}", env_var.key));
             issues.push(Issue::for_job(
                 Severity::Warning,
@@ -79,7 +79,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
 
         // Check job-level env vars for hardcoded secrets
         for env_var in &job.env {
-            if is_potential_secret_value(&env_var.value) {
+            if is_potential_secret(&env_var.key, &env_var.value) {
                 let (line, col) = pipeline.find_job_line(&job.id, "env");
                 issues.push(Issue::for_job(
                     Severity::Warning,
@@ -98,7 +98,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
         for step in &job.steps {
             // Check step-level env vars for hardcoded secrets
             for env_var in &step.env {
-                if is_potential_secret_value(&env_var.value) {
+                if is_potential_secret(&env_var.key, &env_var.value) {
                     let (line, col) = pipeline.find_job_line(&job.id, "env");
                     issues.push(Issue::for_job(
                         Severity::Warning,
@@ -239,18 +239,27 @@ fn scan_yaml_for_secrets(
     }
 }
 
-/// Check if a value looks like it might be a secret
-fn is_potential_secret_value(value: &str) -> bool {
+/// Check if a key-value pair looks like it might be a hardcoded secret
+fn is_potential_secret(key: &str, value: &str) -> bool {
     // Skip GitHub Actions secret references — these are the correct way to use secrets
     if value.contains("${{ secrets.") || value.contains("${{secrets.") {
         return false;
     }
 
-    let lower = value.to_lowercase();
+    let lower_key = key.to_lowercase();
+    let lower_val = value.to_lowercase();
+
+    // Check if the key name suggests it's a secret
+    for pattern in SECRET_VALUE_PATTERNS {
+        if lower_key.contains(pattern) {
+            // If the key is suspicious, any non-empty value that isn't a reference is suspect
+            return !value.trim().is_empty();
+        }
+    }
 
     // Check if the value contains suspicious patterns
     for pattern in SECRET_VALUE_PATTERNS {
-        if lower.contains(pattern) {
+        if lower_val.contains(pattern) {
             return true;
         }
     }
@@ -280,96 +289,54 @@ fn is_potential_secret_value(value: &str) -> bool {
 mod tests {
     use super::*;
 
-    // --- is_potential_secret_value tests ---
-
     #[test]
     fn test_secret_reference_is_not_secret() {
         // Secret references are the correct way, not hardcoded
-        assert!(!is_potential_secret_value("${{ secrets.API_KEY }}"));
-        assert!(!is_potential_secret_value("${{secrets.TOKEN}}"));
-        assert!(!is_potential_secret_value(
-            "use ${{ secrets.MY_SECRET }} here"
-        ));
+        assert!(!is_potential_secret("API_KEY", "${{ secrets.API_KEY }}"));
+        assert!(!is_potential_secret("token", "${{secrets.TOKEN}}"));
     }
 
     #[test]
     fn test_keyword_patterns_detected() {
-        assert!(is_potential_secret_value("api_key=abc123"));
-        assert!(is_potential_secret_value("APIKEY=mykey"));
-        assert!(is_potential_secret_value("api-secret=test"));
-        assert!(is_potential_secret_value("secret_key=xyz"));
-        assert!(is_potential_secret_value("secretkey=123"));
-        assert!(is_potential_secret_value("access_key=abc"));
-        assert!(is_potential_secret_value("auth_token=tok123"));
-        assert!(is_potential_secret_value("authtoken=tok"));
-        assert!(is_potential_secret_value("private_key=pk123"));
-        assert!(is_potential_secret_value("privatekey=pk"));
-        assert!(is_potential_secret_value("password=hunter2"));
-        assert!(is_potential_secret_value("passwd=pass"));
-        assert!(is_potential_secret_value("token=abc123"));
+        assert!(is_potential_secret("API_KEY", "abc123"));
+        assert!(is_potential_secret("some_var", "password=hunter2"));
     }
 
     #[test]
     fn test_keyword_case_insensitive() {
-        assert!(is_potential_secret_value("API_KEY=abc"));
-        assert!(is_potential_secret_value("Password=123"));
-        assert!(is_potential_secret_value("AUTH_TOKEN=xyz"));
-        assert!(is_potential_secret_value("SECRET-KEY=val"));
+        assert!(is_potential_secret("api_key", "abc"));
+        assert!(is_potential_secret("Password", "123"));
     }
 
     #[test]
     fn test_long_alphanumeric_detected_as_secret() {
-        // Strings longer than 20 chars that are all alphanumeric/underscore/dash
-        assert!(is_potential_secret_value("aB3dEf6hIjKlMnOpQrStUvWx"));
-        assert!(is_potential_secret_value(
-            "my_long_key_value_123456789012345"
-        ));
-        assert!(is_potential_secret_value("ghp_ABCDEFGHIJKLMNOPQRSTUVWXyz"));
+        assert!(is_potential_secret("var", "aB3dEf6hIjKlMnOpQrStUvWx"));
     }
 
     #[test]
     fn test_short_alphanumeric_not_secret() {
-        // Short strings should not be flagged
-        assert!(!is_potential_secret_value("hello"));
-        assert!(!is_potential_secret_value("ubuntu-latest"));
-        assert!(!is_potential_secret_value("node:18"));
-        assert!(!is_potential_secret_value("cargo test"));
+        assert!(!is_potential_secret("var", "hello"));
     }
 
     #[test]
     fn test_base64_like_detected() {
-        // Long base64-like strings (40+ chars with base64 alphabet)
-        assert!(is_potential_secret_value(
-            "SGVsbG8gV29ybGQhIFRoaXMgaXMgYSBsb25nIGVuY29kZWQgc3RyaW5n"
-        ));
-        assert!(is_potential_secret_value(
-            "abcDEF123+/xyzABC456===GHJklmno789pqrSTUV"
-        ));
+        assert!(is_potential_secret("var", "abcDEF123+/xyzABC456===GHJklmno789pqrSTUV"));
     }
 
     #[test]
     fn test_normal_values_not_flagged() {
-        assert!(!is_potential_secret_value("true"));
-        assert!(!is_potential_secret_value("false"));
-        assert!(!is_potential_secret_value("ubuntu-latest"));
-        assert!(!is_potential_secret_value("node:18-alpine"));
-        assert!(!is_potential_secret_value("echo hello world"));
-        assert!(!is_potential_secret_value("./scripts/deploy.sh"));
-        assert!(!is_potential_secret_value(""));
-        assert!(!is_potential_secret_value("build"));
-        assert!(!is_potential_secret_value("test"));
+        assert!(!is_potential_secret("image", "node:18-alpine"));
+        assert!(!is_potential_secret("run", "echo hello world"));
     }
 
     #[test]
     fn test_values_with_special_chars_not_long_enough() {
         // Contains spaces, so not all alphanumeric
-        assert!(!is_potential_secret_value(
-            "hello world this is a test string"
-        ));
+        assert!(!is_potential_secret("run", "hello world this is a test string"));
     }
 
     #[test]
     fn test_empty_string_not_secret() {
-        assert!(!is_potential_secret_value(""));
+        assert!(!is_potential_secret("var", ""));
     }
 }

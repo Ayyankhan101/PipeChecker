@@ -171,7 +171,7 @@ pub struct Pipeline {
     pub source: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Job {
     pub id: String,
     pub name: Option<String>,

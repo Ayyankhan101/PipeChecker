@@ -42,6 +42,21 @@ pub fn parse(content: &str) -> Result<Pipeline> {
         }
     }
 
+    // Parse global image
+    let global_image = mapping.get("image").and_then(|v| {
+        if let Value::String(s) = v {
+            Some(s.clone())
+        } else if let Value::Mapping(m) = v {
+            if let Some(Value::String(s)) = m.get(Value::String("name".to_string())) {
+                Some(s.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    });
+
     // Parse jobs (everything under top-level keys that aren't reserved keywords)
     let reserved = vec![
         "stages",
@@ -75,10 +90,15 @@ pub fn parse(content: &str) -> Result<Pipeline> {
 
         // Each other top-level key is a job
         if let Some(job_map) = value.as_mapping() {
-            let job = parse_job(key_str, job_map)?;
+            let mut job = parse_job(key_str, job_map)?;
+            // If job doesn't have an image, use global default
+            if job.container_image.is_none() {
+                job.container_image = global_image.clone();
+            }
             jobs.push(job);
         }
     }
+
 
     Ok(Pipeline {
         provider: Provider::GitLabCI,
