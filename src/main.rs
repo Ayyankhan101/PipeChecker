@@ -50,18 +50,16 @@ fn get_changed_workflows(base_branch: &str) -> Vec<String> {
         .output();
 
     match output {
-        Ok(output) if output.status.success() => {
-            String::from_utf8_lossy(&output.stdout)
-                .lines()
-                .filter(|f| {
-                    f.contains(".github/workflows")
-                        || f.contains(".gitlab-ci")
-                        || f.contains(".circleci")
-                })
-                .filter(|f| f.ends_with(".yml") || f.ends_with(".yaml"))
-                .map(String::from)
-                .collect()
-        }
+        Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter(|f| {
+                f.contains(".github/workflows")
+                    || f.contains(".gitlab-ci")
+                    || f.contains(".circleci")
+            })
+            .filter(|f| f.ends_with(".yml") || f.ends_with(".yaml"))
+            .map(String::from)
+            .collect(),
         _ => Vec::new(),
     }
 }
