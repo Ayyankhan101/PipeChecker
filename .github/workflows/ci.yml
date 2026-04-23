@@ -281,6 +281,15 @@ jobs:
             cargo build --target ${{ matrix.target }}
           fi
 
+      - name: Build pipechecker binary
+        shell: bash
+        run: |
+          if [ "${{ matrix.use-cross }}" = "true" ]; then
+            cross build --target ${{ matrix.target }}
+          else
+            cargo build --target ${{ matrix.target }}
+          fi
+
       - name: Run tests
         shell: bash
         run: |
@@ -386,6 +395,10 @@ jobs:
           restore-keys: ${{ runner.os }}-${{ matrix.target }}-target-
 
       - name: Build
+        shell: bash
+        run: cargo build --target ${{ matrix.target }}
+
+      - name: Build pipechecker binary
         shell: bash
         run: cargo build --target ${{ matrix.target }}
 
