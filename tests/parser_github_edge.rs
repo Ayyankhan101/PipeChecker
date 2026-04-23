@@ -1,6 +1,5 @@
 //! Extended parser tests for GitHub Actions — edge cases
 
-use pipechecker::models::Pipeline;
 use pipechecker::parsers::{detect_provider, parse};
 
 #[test]

@@ -86,6 +86,14 @@ pub fn audit_content(content: &str, options: AuditOptions) -> Result<AuditResult
         issues.extend(auditors::timeout::audit(&pipeline)?);
     }
 
+    // Include auditor — GitLab include: blocks (always runs for GitLab)
+    if pipeline.provider == crate::models::Provider::GitLabCI {
+        issues.extend(auditors::include::audit(&pipeline)?);
+    }
+
+    // Schema auditor — structural validation (runs after syntax, needs valid YAML)
+    issues.extend(auditors::schema::audit(&pipeline)?);
+
     if options.check_docker_images {
         // Pinning auditor — respect docker_latest_tag toggle
         if options

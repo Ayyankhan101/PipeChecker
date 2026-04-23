@@ -2,7 +2,7 @@
 //!
 //! # Providers
 //! - GitHub Actions (implemented)
-//! - GitLab CI (implemented)
+//! - GitLab CI (implemented, with include: support)
 //! - CircleCI (implemented)
 
 pub mod circleci;

@@ -8,14 +8,27 @@
 //! - Environment variables at global and job levels
 //! - Docker image references via `image` keyword
 //! - Service definitions
+//! - `include` block parsing (local + remote detection)
 
 use crate::error::Result;
 use crate::models::{EnvVar, Job, Pipeline, Provider, Step};
 use serde_yaml::Value;
 
+/// Information about included files from `include:` blocks
+#[derive(Debug, Clone, Default)]
+pub struct IncludeInfo {
+    /// Local file paths included
+    pub local: Vec<String>,
+    /// Remote URLs included
+    pub remote: Vec<String>,
+    /// Project-based includes (project::path)
+    pub project: Vec<String>,
+}
+
 /// Parse GitLab CI configuration YAML content
 ///
 /// Converts GitLab CI syntax to the common Pipeline model.
+/// Note: `include:` blocks are parsed for detection but external files are NOT loaded.
 pub fn parse(content: &str) -> Result<Pipeline> {
     let yaml: Value = serde_yaml::from_str(content)?;
     let mapping = yaml.as_mapping().ok_or_else(|| {
@@ -105,6 +118,78 @@ pub fn parse(content: &str) -> Result<Pipeline> {
         env,
         source: content.to_string(),
     })
+}
+
+/// Parse include blocks to extract referenced files (without loading external content)
+///
+/// Returns IncludeInfo with detected include references.
+/// This does NOT resolve/load external files - just extracts paths for auditing.
+pub fn parse_includes(content: &str) -> Result<IncludeInfo> {
+    let yaml: Value = serde_yaml::from_str(content)?;
+    let mapping = yaml.as_mapping().ok_or_else(|| {
+        crate::error::PipecheckError::InvalidPipeline("Expected YAML mapping".to_string())
+    });
+
+    let mut info = IncludeInfo::default();
+
+    // Get the include block
+    let include_val = match mapping {
+        Ok(m) => m.get("include"),
+        Err(e) => return Err(e),
+    };
+
+    let Some(include_block) = include_val else {
+        return Ok(info);
+    };
+
+    let Value::Sequence(includes) = include_block else {
+        // Single include as string
+        if let Value::String(s) = include_block {
+            classify_include(s, &mut info);
+        }
+        return Ok(info);
+    };
+
+    // Each item in the include array
+    for item in includes {
+        match item {
+            Value::String(s) => {
+                classify_include(s, &mut info);
+            }
+            Value::Mapping(m) => {
+                // Could be { local: "path" }, { remote: "url" }, { project: "path" }
+                if let Some(Value::String(s)) = m.get("local") {
+                    info.local.push(s.clone());
+                }
+                if let Some(Value::String(s)) = m.get("remote") {
+                    info.remote.push(s.clone());
+                }
+                if let Some(Value::String(s)) = m.get("project") {
+                    // project::path format
+                    if let Some(Value::String(path)) = m.get("file") {
+                        info.project.push(format!("{}:{}", s, path));
+                    } else {
+                        info.project.push(s.clone());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(info)
+}
+
+/// Classify a single include string into the appropriate category
+fn classify_include(s: &str, info: &mut IncludeInfo) {
+    if s.starts_with("https://") || s.starts_with("http://") {
+        info.remote.push(s.to_string());
+    } else if s.contains("::") {
+        info.project.push(s.to_string());
+    } else {
+        // Local file
+        info.local.push(s.to_string());
+    }
 }
 
 fn parse_job(id: &str, map: &serde_yaml::Mapping) -> Result<Job> {
