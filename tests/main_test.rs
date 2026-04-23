@@ -28,8 +28,8 @@ jobs:
 fn test_init_template_creates_file() {
     setup_template_test();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_pipechecker"))
-        .args(["--init", "--template", "node"])
+    let output = Command::new("cargo")
+        .args(["run", "--", "--init", "--template", "node"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
@@ -45,8 +45,8 @@ fn test_init_template_creates_file() {
 fn test_init_template_rust() {
     setup_template_test();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_pipechecker"))
-        .args(["--init", "--template", "rust"])
+    let output = Command::new("cargo")
+        .args(["run", "--", "--init", "--template", "rust"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
@@ -62,8 +62,8 @@ fn test_init_template_rust() {
 fn test_init_template_unknown() {
     setup_template_test();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_pipechecker"))
-        .args(["--init", "--template", "invalid"])
+    let output = Command::new("cargo")
+        .args(["run", "--", "--init", "--template", "invalid"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
@@ -73,8 +73,8 @@ fn test_init_template_unknown() {
 
 #[test]
 fn test_diff_branch_default() {
-    let output = Command::new(env!("CARGO_BIN_EXE_pipechecker"))
-        .args(["--help"])
+    let output = Command::new("cargo")
+        .args(["run", "--", "--help"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
@@ -85,8 +85,8 @@ fn test_diff_branch_default() {
 
 #[test]
 fn test_help_shows_diff() {
-    let output = Command::new(env!("CARGO_BIN_EXE_pipechecker"))
-        .args(["--help"])
+    let output = Command::new("cargo")
+        .args(["run", "--", "--help"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
@@ -99,8 +99,8 @@ fn test_help_shows_diff() {
 
 #[test]
 fn test_quiet_mode() {
-    let output = Command::new(env!("CARGO_BIN_EXE_pipechecker"))
-        .args(["--quiet", "tests/fixtures/github/valid.yml"])
+    let output = Command::new("cargo")
+        .args(["run", "--", "--quiet", "tests/fixtures/github/valid.yml"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
@@ -111,8 +111,8 @@ fn test_quiet_mode() {
 
 #[test]
 fn test_strict_mode() {
-    let output = Command::new(env!("CARGO_BIN_EXE_pipechecker"))
-        .args(["--strict", "tests/fixtures/github/valid.yml"])
+    let output = Command::new("cargo")
+        .args(["run", "--", "--strict", "tests/fixtures/github/valid.yml"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
@@ -124,8 +124,8 @@ fn test_strict_mode() {
 
 #[test]
 fn test_json_format() {
-    let output = Command::new(env!("CARGO_BIN_EXE_pipechecker"))
-        .args(["-f", "json", "tests/fixtures/github/valid.yml"])
+    let output = Command::new("cargo")
+        .args(["run", "--", "-f", "json", "tests/fixtures/github/valid.yml"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
@@ -136,8 +136,8 @@ fn test_json_format() {
 
 #[test]
 fn test_verbose_mode() {
-    let output = Command::new(env!("CARGO_BIN_EXE_pipechecker"))
-        .args(["--verbose", "tests/fixtures/github/valid.yml"])
+    let output = Command::new("cargo")
+        .args(["run", "--", "--verbose", "tests/fixtures/github/valid.yml"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
@@ -148,8 +148,8 @@ fn test_verbose_mode() {
 
 #[test]
 fn test_no_pinning_flag() {
-    let output = Command::new(env!("CARGO_BIN_EXE_pipechecker"))
-        .args(["--no-pinning", "tests/fixtures/github/valid.yml"])
+    let output = Command::new("cargo")
+        .args(["run", "--", "--no-pinning", "tests/fixtures/github/valid.yml"])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
