@@ -282,13 +282,9 @@ jobs:
           fi
 
       - name: Build pipechecker binary
+        if: matrix.use-cross != true
         shell: bash
-        run: |
-          if [ "${{ matrix.use-cross }}" = "true" ]; then
-            cross build --target ${{ matrix.target }}
-          else
-            cargo build --target ${{ matrix.target }}
-          fi
+        run: cargo build
 
       - name: Run tests
         shell: bash
@@ -400,7 +396,7 @@ jobs:
 
       - name: Build pipechecker binary
         shell: bash
-        run: cargo build --target ${{ matrix.target }}
+        run: cargo build
 
       - name: Run tests
         shell: bash
