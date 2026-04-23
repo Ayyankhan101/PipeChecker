@@ -149,7 +149,12 @@ fn test_verbose_mode() {
 #[test]
 fn test_no_pinning_flag() {
     let output = Command::new("cargo")
-        .args(["run", "--", "--no-pinning", "tests/fixtures/github/valid.yml"])
+        .args([
+            "run",
+            "--",
+            "--no-pinning",
+            "tests/fixtures/github/valid.yml",
+        ])
         .current_dir("/home/ayyan/project/PipeChecker")
         .output()
         .expect("Failed to run command");
