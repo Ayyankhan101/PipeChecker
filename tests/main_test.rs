@@ -1,5 +1,6 @@
 //! Tests for CLI main function and flags
 
+use std::env::current_dir;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -30,7 +31,7 @@ fn test_init_template_creates_file() {
 
     let output = Command::new("cargo")
         .args(["run", "--", "--init", "--template", "node"])
-        .current_dir("/home/ayyan/project/PipeChecker")
+        .current_dir(current_dir().unwrap())
         .output()
         .expect("Failed to run command");
 
@@ -47,7 +48,7 @@ fn test_init_template_rust() {
 
     let output = Command::new("cargo")
         .args(["run", "--", "--init", "--template", "rust"])
-        .current_dir("/home/ayyan/project/PipeChecker")
+        .current_dir(current_dir().unwrap())
         .output()
         .expect("Failed to run command");
 
@@ -64,7 +65,7 @@ fn test_init_template_unknown() {
 
     let output = Command::new("cargo")
         .args(["run", "--", "--init", "--template", "invalid"])
-        .current_dir("/home/ayyan/project/PipeChecker")
+        .current_dir(current_dir().unwrap())
         .output()
         .expect("Failed to run command");
 
@@ -75,7 +76,7 @@ fn test_init_template_unknown() {
 fn test_diff_branch_default() {
     let output = Command::new("cargo")
         .args(["run", "--", "--help"])
-        .current_dir("/home/ayyan/project/PipeChecker")
+        .current_dir(current_dir().unwrap())
         .output()
         .expect("Failed to run command");
 
@@ -87,7 +88,7 @@ fn test_diff_branch_default() {
 fn test_help_shows_diff() {
     let output = Command::new("cargo")
         .args(["run", "--", "--help"])
-        .current_dir("/home/ayyan/project/PipeChecker")
+        .current_dir(current_dir().unwrap())
         .output()
         .expect("Failed to run command");
 
@@ -101,7 +102,7 @@ fn test_help_shows_diff() {
 fn test_quiet_mode() {
     let output = Command::new("cargo")
         .args(["run", "--", "--quiet", "tests/fixtures/github/valid.yml"])
-        .current_dir("/home/ayyan/project/PipeChecker")
+        .current_dir(current_dir().unwrap())
         .output()
         .expect("Failed to run command");
 
@@ -113,7 +114,7 @@ fn test_quiet_mode() {
 fn test_strict_mode() {
     let output = Command::new("cargo")
         .args(["run", "--", "--strict", "tests/fixtures/github/valid.yml"])
-        .current_dir("/home/ayyan/project/PipeChecker")
+        .current_dir(current_dir().unwrap())
         .output()
         .expect("Failed to run command");
 
@@ -126,7 +127,7 @@ fn test_strict_mode() {
 fn test_json_format() {
     let output = Command::new("cargo")
         .args(["run", "--", "-f", "json", "tests/fixtures/github/valid.yml"])
-        .current_dir("/home/ayyan/project/PipeChecker")
+        .current_dir(current_dir().unwrap())
         .output()
         .expect("Failed to run command");
 
@@ -138,7 +139,7 @@ fn test_json_format() {
 fn test_verbose_mode() {
     let output = Command::new("cargo")
         .args(["run", "--", "--verbose", "tests/fixtures/github/valid.yml"])
-        .current_dir("/home/ayyan/project/PipeChecker")
+        .current_dir(current_dir().unwrap())
         .output()
         .expect("Failed to run command");
 
@@ -155,7 +156,7 @@ fn test_no_pinning_flag() {
             "--no-pinning",
             "tests/fixtures/github/valid.yml",
         ])
-        .current_dir("/home/ayyan/project/PipeChecker")
+        .current_dir(current_dir().unwrap())
         .output()
         .expect("Failed to run command");
 
