@@ -8,7 +8,7 @@
 //! - Hardcoded values in `env:` fields that look like secrets
 
 use crate::error::Result;
-use crate::models::{Issue, Pipeline, Severity};
+use crate::models::{rule_codes, Issue, Pipeline, Severity};
 use regex::Regex;
 use std::sync::OnceLock;
 static SECRET_REGEX: OnceLock<Regex> = OnceLock::new();
@@ -54,7 +54,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
     for env_var in &pipeline.env {
         if is_potential_secret(&env_var.key, &env_var.value) {
             let (line, col) = pipeline.find_line(&format!("  {}", env_var.key));
-            issues.push(Issue::for_job(
+            issues.push(Issue::for_job_with_code(
                 Severity::Warning,
                 &format!(
                     "Pipeline env '{}' may contain a hardcoded secret",
@@ -67,6 +67,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                     "Use secrets.{} instead of hardcoding",
                     env_var.key.to_lowercase().replace("_", "-")
                 )),
+                rule_codes::HARDCODED_SECRET,
             ));
         }
     }
@@ -81,7 +82,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
         for env_var in &job.env {
             if is_potential_secret(&env_var.key, &env_var.value) {
                 let (line, col) = pipeline.find_job_line(&job.id, "env");
-                issues.push(Issue::for_job(
+                issues.push(Issue::for_job_with_code(
                     Severity::Warning,
                     &format!(
                         "Job '{}' env '{}' may contain a hardcoded secret",
@@ -91,6 +92,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                     line,
                     col,
                     Some("Use repository secrets or workflow-level env vars instead".to_string()),
+                    rule_codes::HARDCODED_SECRET,
                 ));
             }
         }
@@ -100,7 +102,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
             for env_var in &step.env {
                 if is_potential_secret(&env_var.key, &env_var.value) {
                     let (line, col) = pipeline.find_job_line(&job.id, "env");
-                    issues.push(Issue::for_job(
+                    issues.push(Issue::for_job_with_code(
                         Severity::Warning,
                         &format!(
                             "Job '{}' step env '{}' may contain a hardcoded secret",
@@ -110,6 +112,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                         line,
                         col,
                         Some("Use repository secrets instead of hardcoded values".to_string()),
+                        rule_codes::HARDCODED_SECRET,
                     ));
                 }
                 declared_env.insert(env_var.key.clone());
@@ -120,13 +123,14 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                 for cap in secret_pattern.captures_iter(run) {
                     let secret_name = &cap[1];
                     let (line, col) = pipeline.find_job_line(&job.id, "run");
-                    issues.push(Issue::for_job(
+                    issues.push(Issue::for_job_with_code(
                         Severity::Info,
                         &format!("Job '{}' uses secret: {}", job.id, secret_name),
                         &job.id,
                         line,
                         col,
                         Some("Ensure this secret is configured in repository settings".to_string()),
+                        rule_codes::SECRET_REFERENCE,
                     ));
                 }
 
@@ -134,7 +138,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                     let env_name = &cap[1];
                     if !declared_env.contains(env_name) {
                         let (line, col) = pipeline.find_job_line(&job.id, "run");
-                        issues.push(Issue::for_job(
+                        issues.push(Issue::for_job_with_code(
                             Severity::Warning,
                             &format!(
                                 "Job '{}' references undeclared env var: {}",
@@ -144,6 +148,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                             line,
                             col,
                             Some(format!("Declare '{}' in env section", env_name)),
+                            rule_codes::UNDECLARED_ENV_VAR,
                         ));
                     }
                 }
@@ -182,20 +187,21 @@ fn scan_yaml_for_secrets(
             for cap in secret_pattern.captures_iter(s) {
                 let secret_name = &cap[1];
                 let (line, col) = pipeline.find_job_line(job_id, "with");
-                issues.push(Issue::for_job(
+                issues.push(Issue::for_job_with_code(
                     Severity::Info,
                     &format!("Job '{}' uses secret: {}", job_id, secret_name),
                     job_id,
                     line,
                     col,
                     Some("Ensure this secret is configured in repository settings".to_string()),
+                    rule_codes::SECRET_REFERENCE,
                 ));
             }
             for cap in env_pattern.captures_iter(s) {
                 let env_name = &cap[1];
                 if !declared_env.contains(env_name) {
                     let (line, col) = pipeline.find_job_line(job_id, "with");
-                    issues.push(Issue::for_job(
+                    issues.push(Issue::for_job_with_code(
                         Severity::Warning,
                         &format!(
                             "Job '{}' references undeclared env var: {}",
@@ -205,6 +211,7 @@ fn scan_yaml_for_secrets(
                         line,
                         col,
                         Some(format!("Declare '{}' in env section", env_name)),
+                        rule_codes::UNDECLARED_ENV_VAR,
                     ));
                 }
             }

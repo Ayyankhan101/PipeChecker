@@ -465,6 +465,7 @@ mod tests {
                 job: Some("build".to_string()),
             }),
             suggestion: Some("fix the syntax".to_string()),
+            rule_code: None,
         };
         let result = make_result(vec![issue]);
         let app = make_app(vec!["loc.yml"], vec![Some(result)]);

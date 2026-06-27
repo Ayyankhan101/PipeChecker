@@ -6,7 +6,7 @@
 //! - Reports missing dependencies (references to non-existent jobs)
 
 use crate::error::Result;
-use crate::models::{Issue, Pipeline, Severity};
+use crate::models::{rule_codes, Issue, Pipeline, Severity};
 use petgraph::algo::tarjan_scc;
 use petgraph::graph::DiGraph;
 use std::collections::HashMap;
@@ -86,13 +86,14 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
             let first_job = &graph[current];
             let (line, col) = pipeline.find_job_line(first_job, "runs-on");
 
-            issues.push(Issue::for_job(
+            issues.push(Issue::for_job_with_code(
                 Severity::Error,
                 &format!("Circular dependency detected: {}", cycle_str),
                 first_job,
                 line,
                 col,
                 Some("Remove one of the dependencies to break the cycle".to_string()),
+                rule_codes::CIRCULAR_DEPENDENCY,
             ));
         }
     }

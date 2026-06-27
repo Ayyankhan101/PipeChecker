@@ -31,6 +31,10 @@ Every developer has been here:
 | ⚠️ **Unpinned actions** | `uses: actions/checkout` without `@v4` |
 | ⚠️ **Docker `:latest` tags** | `image: nginx:latest` (unreproducible builds) |
 | ⚠️ **Missing job timeouts** | No `timeout-minutes` set — jobs can run forever |
+| ⚠️ **Missing permissions** | No `permissions:` block — inherits write-all token |
+| ⚠️ **Missing concurrency cancel** | Concurrency group without `cancel-in-progress` |
+| ⚠️ **Static cache keys** | `actions/cache` without `hashFiles(...)` |
+| ℹ️ **Missing retention-days** | `actions/upload-artifact` with default 90-day retention |
 
 ---
 
@@ -58,6 +62,11 @@ Every developer has been here:
               │  │  📋 Syntax     │  │
               │  │  🔗 DAG/Cycle  │  │
               │  │  🔒 Secrets    │  │
+              │  │  ⏱️  Timeout    │  │
+              │  │  🔐 Permissions│  │
+              │  │  📐 Schema     │  │
+              │  │  🔄 Concurrency│  │
+              │  │  📦 Artifacts  │  │
               │  │  🐳 Docker     │  │
               │  │  📌 Pinning    │  │
               │  └───────┬────────┘  │
@@ -127,7 +136,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: Ayyankhan101/PipeCheck/actions/pipecheck@v0.2.9
+      - uses: Ayyankhan101/PipeCheck/actions/pipecheck@v0.3.0
 ```
 
 ### Action Inputs
@@ -235,12 +244,21 @@ pipechecker --tui
 | `--tui` | Launch the interactive terminal UI |
 | `--watch`, `-w` | Watch for file changes and re-run audits |
 | `--fix` | Auto-fix issues (pin unpinned actions + Docker `:latest` tags) |
+| `--init` | Initialize a new workflow from a template |
+| `--template` <name> | Template name: `node`, `rust`, `docker`, `gitlab-node` |
+| `--force` | Force overwrite existing files (with `--init`) |
 | `--install-hook` | Install a git pre-commit hook |
+| `--diff`, `-d` | Check only files changed since base branch |
+| `--diff-branch` <branch> | Base branch for diff mode (default: `main`) |
 | `--format`, `-f` `<text\|json>` | Output format (default: `text`) |
 | `--strict`, `-s` | Treat warnings as errors (exit code 1) |
-| `--quiet`, `-q` | Only output errors — suppress warnings and info. Perfect for CI |
-| `--verbose` | Show diagnostic info (auditors ran, per-severity counts, discovered files) |
+| `--quiet`, `-q` | Only output errors — suppress warnings and info |
+| `--ci` | CI mode — implies `--quiet --strict --format json` |
+| `--verbose` | Show diagnostic info (auditors ran, per-severity counts) |
+| `--explain` <CODE> | Print detailed explanation for a rule code (e.g. `PC005`) |
 | `--no-pinning` | Skip Docker image and action-pinning checks |
+| `--no-permissions` | Skip permissions auditor (GitHub Actions only) |
+| `--no-schema` | Skip schema validation |
 | `--version` | Show version |
 | `--help` | Show help |
 
@@ -262,13 +280,13 @@ pipechecker --tui
 Provider: GitHubActions
 2 errors, 1 warnings
 
-❌ ERROR: Circular dependency detected (job: deploy) [line 42]
+❌ ERROR: Circular dependency detected (job: deploy) [PC005] [line 42]
    💡 Remove one of the dependencies to break the cycle
 
-❌ ERROR: Job 'deploy' depends on non-existent job 'build' (job: deploy) [line 45]
+❌ ERROR: Job 'deploy' depends on non-existent job 'build' (job: deploy) [PC004] [line 45]
    💡 Add a job with id 'build' or remove the dependency
 
-⚠️ WARNING: Job 'lint' has no steps (job: lint) [line 12]
+⚠️ WARNING: Job 'lint' has no steps (job: lint) [PC003] [line 12]
    💡 Add steps to perform work in this job
 ```
 
@@ -295,7 +313,8 @@ pipechecker --format json
       "severity": "Error",
       "message": "Circular dependency detected: job-a -> job-b -> job-a",
       "location": { "line": 42, "column": 3, "job": "deploy" },
-      "suggestion": "Remove one of the dependencies to break the cycle"
+      "suggestion": "Remove one of the dependencies to break the cycle",
+      "rule_code": "PC005"
     }
   ],
   "summary": "1 errors, 0 warnings"
@@ -356,6 +375,51 @@ pipechecker -q
 
 Exit code is still `1` if there are errors — works perfectly with `--strict` for failing CI on any issue.
 
+### 🤖 CI Mode
+One flag that implies `--quiet --strict --format json`. Ideal for CI automation:
+
+```bash
+pipechecker --ci
+```
+
+### 📖 Explain Mode
+Get a detailed explanation for any rule code:
+
+```bash
+pipechecker --explain PC005
+```
+
+```
+📖 Rule PC005 — Circular dependency detected
+
+Two or more jobs form a dependency cycle (A needs B, B needs A).
+The pipeline can never start because each job is waiting for another.
+Remove one of the edges in the cycle to break it.
+```
+
+**Available rule codes:**
+
+| Code | Rule |
+|------|------|
+| `PC001` | Empty pipeline |
+| `PC002` | Duplicate job ID |
+| `PC003` | Empty job steps |
+| `PC004` | Missing dependency |
+| `PC005` | Circular dependency |
+| `PC006` | Hardcoded secret |
+| `PC007` | Secret reference |
+| `PC008` | Undeclared env var |
+| `PC009` | Unpinned action |
+| `PC010` | Docker `:latest` tag |
+| `PC011` | Missing timeout |
+| `PC012` | Missing trigger |
+| `PC013` | Missing `runs-on` |
+| `PC014` | Missing permissions |
+| `PC015` | Invalid YAML |
+| `PC016` | Missing concurrency cancel |
+| `PC017` | Static cache key |
+| `PC018` | Missing artifact retention |
+
 ### 📢 Verbose Mode
 See exactly what PipeChecker is doing — which files it found, which auditors ran, and per-severity breakdowns:
 
@@ -365,7 +429,7 @@ pipechecker --verbose
 
 ```
 📄 Auditing: .github/workflows/ci.yml
-🔍 Auditors ran: syntax, dag, secrets, pinning
+🔍 Auditors ran: syntax, dag, secrets, timeout, permissions, schema, concurrency, artifacts, pinning
 📊 Found: 0 errors, 1 warnings, 0 info
 ⏱️  Checked in 3.2ms
 ```
@@ -427,6 +491,11 @@ rules:
   circular_dependencies: true   # Detect dependency cycles
   missing_secrets: true         # Flag hardcoded secrets
   docker_latest_tag: true       # Warn about :latest tags
+  timeout_validation: true      # Warn about missing timeouts
+  permissions_check: true       # Warn about missing permissions
+  schema_validation: true       # Structural YAML validation
+  concurrency_validation: true  # Check cancel-in-progress
+  artifacts_check: true         # Cache/artifact best practices
 ```
 
 PipeChecker searches for config in this order:
@@ -484,6 +553,35 @@ image: nginx:latest                 # ⚠️ Unpredictable
 image: nginx:1.25-alpine            # ✅ Specific
 ```
 
+### ⏱️ Timeout Auditor
+Warns when jobs lack `timeout-minutes` — prevents runaway CI jobs:
+
+```yaml
+build:
+  runs-on: ubuntu-latest
+  # ⚠️ No timeout-minutes — can run forever if something hangs
+  steps: [...]
+```
+
+### 🔐 Permissions Auditor
+Warns when GitHub Actions jobs have no explicit `permissions:` block:
+
+```yaml
+build:
+  runs-on: ubuntu-latest
+  # ⚠️ No permissions block — inherits write-all token
+  steps: [...]
+```
+
+### 📐 Schema Auditor
+Validates YAML structure against provider-specific schemas — catches missing keys, bad types, and structural issues.
+
+### 🔄 Concurrency Auditor
+Checks for `cancel-in-progress: true` when concurrency groups are used — prevents wasted CI minutes on outdated runs.
+
+### 📦 Artifacts & Cache Auditor
+Checks `actions/cache` for static keys (should include `hashFiles(...)`) and `actions/upload-artifact` for missing `retention-days`.
+
 ---
 
 ## Real-World Examples
@@ -540,7 +638,7 @@ pipechecker/
 ├── src/
 │   ├── main.rs          # CLI entry point (clap)
 │   ├── lib.rs           # Public API — audit_file, audit_content, discover_workflows
-│   ├── models.rs        # Core types — Pipeline, Job, Step, Issue, Severity
+│   ├── models.rs        # Core types — Pipeline, Job, Step, Issue, Severity, rule codes
 │   ├── error.rs         # Error enum (thiserror)
 │   ├── config.rs        # .pipecheckerrc.yml loading
 │   ├── fix.rs           # Auto-fix for action pinning
@@ -552,10 +650,17 @@ pipechecker/
 │   │   └── circleci.rs  # CircleCI YAML parser
 │   └── auditors/
 │       ├── mod.rs       # Module gate
-│       ├── syntax.rs    # Structural validation
-│       ├── dag.rs       # Dependency graph + cycle detection (petgraph)
-│       ├── secrets.rs   # Secret/env var scanning (regex)
-│       └── pinning.rs   # Action/Docker image pinning
+│       ├── syntax.rs    # Structural validation (PC001–PC004)
+│       ├── dag.rs       # Dependency graph + cycle detection (PC005)
+│       ├── secrets.rs   # Secret/env var scanning (PC006–PC008)
+│       ├── timeout.rs   # Missing timeout detection (PC011)
+│       ├── permissions.rs # GitHub Actions permissions (PC014)
+│       ├── schema.rs    # Structural YAML validation (PC012–PC013, PC015)
+│       ├── concurrency.rs # Concurrency group checks (PC016)
+│       ├── artifacts.rs # Cache/artifact best practices (PC017–PC018)
+│       ├── include.rs   # GitLab include: block parsing
+│       └── pinning.rs   # Action/Docker image pinning (PC009–PC010)
+├── templates/           # Embedded workflow templates
 ├── tests/
 │   ├── parser_test.rs   # Parser integration tests
 │   └── auditors_test.rs # Auditor + fixture tests
@@ -569,10 +674,14 @@ pipechecker/
 Add PipeChecker to your own CI pipeline:
 
 ```yaml
+# Option 1: Use the GitHub Action
+- uses: Ayyankhan101/PipeCheck/actions/pipecheck@v0.3.0
+
+# Option 2: Run directly
 - name: Validate workflows
   run: |
     cargo install pipechecker
-    pipechecker --all --strict --format json
+    pipechecker --ci
 ```
 
 Or use it as a pre-commit hook (recommended):
@@ -588,7 +697,7 @@ pipechecker --install-hook
 ### Run tests
 ```bash
 cargo test
-# 103 tests — all passing
+# 134 tests — all passing
 ```
 
 ### Lint & format

@@ -67,11 +67,19 @@ fn test_rules_all_disabled() {
         missing_secrets: false,
         docker_latest_tag: false,
         timeout_validation: false,
+        permissions_check: false,
+        schema_validation: false,
+        concurrency_validation: false,
+        artifacts_check: false,
     };
     assert!(!rules.circular_dependencies);
     assert!(!rules.missing_secrets);
     assert!(!rules.docker_latest_tag);
     assert!(!rules.timeout_validation);
+    assert!(!rules.permissions_check);
+    assert!(!rules.schema_validation);
+    assert!(!rules.concurrency_validation);
+    assert!(!rules.artifacts_check);
 }
 
 #[test]

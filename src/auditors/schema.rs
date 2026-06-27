@@ -9,7 +9,7 @@
 //! - Type checking for common fields
 
 use crate::error::Result;
-use crate::models::{Issue, Pipeline, Severity};
+use crate::models::{rule_codes, Issue, Pipeline, Severity};
 use serde_yaml::Value;
 use std::collections::HashSet;
 
@@ -21,10 +21,11 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
     let yaml: Value = match serde_yaml::from_str(&pipeline.source) {
         Ok(v) => v,
         Err(e) => {
-            issues.push(Issue::new(
+            issues.push(Issue::with_code(
                 Severity::Error,
                 &format!("Invalid YAML syntax: {}", e),
                 Some("Fix YAML syntax errors first".to_string()),
+                rule_codes::INVALID_YAML,
             ));
             return Ok(issues);
         }
@@ -67,10 +68,11 @@ fn validate_github_actions(
 
     // Check for required 'on' key
     if !mapping.contains_key("on") && !mapping.contains_key("workflow_on") {
-        issues.push(Issue::new(
+        issues.push(Issue::with_code(
             Severity::Warning,
             "GitHub Actions workflow missing 'on' trigger",
             Some("Add workflow triggers (e.g., on: push)".to_string()),
+            rule_codes::MISSING_TRIGGER,
         ));
     }
 
@@ -95,13 +97,14 @@ fn validate_github_actions(
                     let has_steps = job_map.contains_key("steps");
 
                     if !has_runs_on && !has_container {
-                        issues.push(Issue::for_job(
+                        issues.push(Issue::for_job_with_code(
                             Severity::Error,
                             &format!("Job '{}' missing 'runs-on' or 'container'", job_name),
                             job_name,
                             0,
                             0,
                             Some("Specify where to run the job".to_string()),
+                            rule_codes::MISSING_RUNS_ON,
                         ));
                     }
 

@@ -34,7 +34,7 @@ pub mod tui;
 pub use config::load as load_config;
 pub use config::{Config, Rules};
 pub use error::{PipecheckError, Result};
-pub use models::{AuditOptions, AuditResult, Issue, Severity};
+pub use models::{rule_codes, AuditOptions, AuditResult, Issue, Severity};
 
 /// Audit a pipeline configuration file
 #[must_use = "audit results should be handled"]
@@ -86,13 +86,50 @@ pub fn audit_content(content: &str, options: AuditOptions) -> Result<AuditResult
         issues.extend(auditors::timeout::audit(&pipeline)?);
     }
 
+    // Permissions auditor — respect config toggle (GitHub Actions only)
+    if options
+        .rules
+        .as_ref()
+        .map(|r| r.permissions_check)
+        .unwrap_or(true)
+    {
+        issues.extend(auditors::permissions::audit(&pipeline)?);
+    }
+
     // Include auditor — GitLab include: blocks (always runs for GitLab)
     if pipeline.provider == crate::models::Provider::GitLabCI {
         issues.extend(auditors::include::audit(&pipeline)?);
     }
 
     // Schema auditor — structural validation (runs after syntax, needs valid YAML)
-    issues.extend(auditors::schema::audit(&pipeline)?);
+    if options
+        .rules
+        .as_ref()
+        .map(|r| r.schema_validation)
+        .unwrap_or(true)
+    {
+        issues.extend(auditors::schema::audit(&pipeline)?);
+    }
+
+    // Concurrency auditor — checks for cancel-in-progress (GitHub Actions only)
+    if options
+        .rules
+        .as_ref()
+        .map(|r| r.concurrency_validation)
+        .unwrap_or(true)
+    {
+        issues.extend(auditors::concurrency::audit(&pipeline)?);
+    }
+
+    // Artifacts & Cache auditor
+    if options
+        .rules
+        .as_ref()
+        .map(|r| r.artifacts_check)
+        .unwrap_or(true)
+    {
+        issues.extend(auditors::artifacts::audit(&pipeline)?);
+    }
 
     if options.check_docker_images {
         // Pinning auditor — respect docker_latest_tag toggle

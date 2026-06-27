@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-27
+
+### Added
+- **Rule codes** — every issue now carries a machine-readable code (`PC001`–`PC018`) shown in output and JSON.
+- **`--explain <CODE>`** — print a detailed explanation, rationale, and fix guidance for any rule code (e.g. `pipechecker --explain PC005`).
+- **Permissions auditor** (`PC014`) — warns when GitHub Actions jobs have no explicit `permissions:` block, preventing silent inheritance of write-all token permissions.
+- **`--ci` flag** — convenience flag that implies `--quiet --strict --format json`. Ideal for CI automation without having to remember three separate flags.
+- **`--no-permissions` flag** — skip the new permissions auditor independently of other checks.
+- **`permissions_check` config rule** — disable the permissions auditor in `.pipecheckerrc.yml`.
+- **Embedded templates** — `--init` templates are now embedded at compile time via `include_str!()`, fixing path resolution when the binary is run from any directory.
+- **Improved watch mode** — Replaced CPU-heavy 2-second polling with kernel-level file watching using the `notify` crate, making `--watch` instant and battery-friendly.
+
+### Changed
+- Refactored duplicated audit-loop in `main.rs` into a single `run_audits_on_files()` helper (eliminated ~80 lines of copy-paste).
+- `print_issue()` helper now also displays the rule code in brackets (e.g. `[PC005]`) when present.
+- Verbose mode now lists all 9 auditors instead of 6.
+- Wired up all 18 rule codes — every auditor now assigns its designated code to issues.
+- Verbose mode auditor list updated to reflect all active auditors.
+
+### Fixed
+- `--init --template <name>` no longer fails when run from a directory other than the project root.
+- Fixed compile errors in `artifacts.rs` (`serde_yaml::Value` type mismatches).
+- `--explain` error message now correctly shows `PC001-PC018` instead of `PC001-PC015`.
+
+[0.3.0]: https://github.com/Ayyankhan101/PipeCheck/compare/v0.2.10...v0.3.0
+
 ## [0.2.10] - Unreleased
 
 ### Added

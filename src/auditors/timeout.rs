@@ -9,7 +9,7 @@
 //! - CircleCI:       `max_time`
 
 use crate::error::Result;
-use crate::models::{Issue, Pipeline, Severity};
+use crate::models::{rule_codes, Issue, Pipeline, Severity};
 
 /// Audit a pipeline for missing job timeouts
 pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
@@ -23,7 +23,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                 crate::models::Provider::GitLabCI => "timeout",
                 crate::models::Provider::CircleCI => "max_time",
             };
-            issues.push(Issue::for_job(
+            issues.push(Issue::for_job_with_code(
                 Severity::Warning,
                 &format!(
                     "Job '{}' has no '{}' — may run indefinitely if something hangs",
@@ -36,6 +36,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                     "Add '{}' to prevent runaway jobs (e.g. 30)",
                     keyword
                 )),
+                rule_codes::MISSING_TIMEOUT,
             ));
         }
     }

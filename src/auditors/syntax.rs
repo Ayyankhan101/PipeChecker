@@ -7,7 +7,7 @@
 //! - Missing `needs` targets
 
 use crate::error::Result;
-use crate::models::{Issue, Pipeline, Severity};
+use crate::models::{rule_codes, Issue, Pipeline, Severity};
 use std::collections::HashSet;
 
 /// Audit a pipeline for syntax and structural issues
@@ -24,13 +24,14 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
     // Check for empty jobs
     if pipeline.jobs.is_empty() {
         let (line, col) = pipeline.find_line("jobs:");
-        issues.push(Issue::for_job(
+        issues.push(Issue::for_job_with_code(
             Severity::Error,
             "Pipeline has no jobs defined",
             "",
             line,
             col,
             Some("Add at least one job to your pipeline".to_string()),
+            rule_codes::EMPTY_PIPELINE,
         ));
     }
 
@@ -39,26 +40,28 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
     for job in &pipeline.jobs {
         if !seen_ids.insert(&job.id) {
             let (line, col) = pipeline.find_job_line(&job.id, "runs-on");
-            issues.push(Issue::for_job(
+            issues.push(Issue::for_job_with_code(
                 Severity::Error,
                 &format!("Duplicate job ID: {}", job.id),
                 &job.id,
                 line,
                 col,
                 Some("Each job must have a unique ID".to_string()),
+                rule_codes::DUPLICATE_JOB_ID,
             ));
         }
 
         // Check for empty steps
         if job.steps.is_empty() {
             let (line, col) = pipeline.find_job_line(&job.id, "runs-on");
-            issues.push(Issue::for_job(
+            issues.push(Issue::for_job_with_code(
                 Severity::Warning,
                 &format!("Job '{}' has no steps", job.id),
                 &job.id,
                 line,
                 col,
                 Some("Add steps to perform work in this job".to_string()),
+                rule_codes::EMPTY_JOB_STEPS,
             ));
         }
 
@@ -66,7 +69,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
         for dep in &job.depends_on {
             if !job_ids.contains(dep.as_str()) {
                 let (line, col) = pipeline.find_job_line(&job.id, "needs");
-                issues.push(Issue::for_job(
+                issues.push(Issue::for_job_with_code(
                     Severity::Error,
                     &format!("Job '{}' depends on non-existent job '{}'", job.id, dep),
                     &job.id,
@@ -76,6 +79,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                         "Add a job with id '{}' or remove the dependency",
                         dep
                     )),
+                    rule_codes::MISSING_DEPENDENCY,
                 ));
             }
         }

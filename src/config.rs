@@ -41,20 +41,35 @@ pub struct Rules {
 
     #[serde(default = "default_true")]
     pub timeout_validation: bool,
+
+    #[serde(default = "default_true")]
+    pub permissions_check: bool,
+
+    #[serde(default = "default_true")]
+    pub schema_validation: bool,
+
+    #[serde(default = "default_true")]
+    pub concurrency_validation: bool,
+
+    #[serde(default = "default_true")]
+    pub artifacts_check: bool,
 }
 
 fn default_true() -> bool {
     true
 }
 
-#[allow(clippy::derivable_impls)]
 impl Default for Rules {
     fn default() -> Self {
-        Rules {
+        Self {
             circular_dependencies: true,
             missing_secrets: true,
             docker_latest_tag: true,
             timeout_validation: true,
+            permissions_check: true,
+            schema_validation: true,
+            concurrency_validation: true,
+            artifacts_check: true,
         }
     }
 }

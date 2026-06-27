@@ -34,6 +34,31 @@ pub struct Issue {
     pub message: String,
     pub location: Option<Location>,
     pub suggestion: Option<String>,
+    /// Short machine-readable rule code, e.g. "PC001"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule_code: Option<&'static str>,
+}
+
+/// Rule code constants — each auditor assigns one of these to its issues.
+pub mod rule_codes {
+    pub const EMPTY_PIPELINE: &str = "PC001";
+    pub const DUPLICATE_JOB_ID: &str = "PC002";
+    pub const EMPTY_JOB_STEPS: &str = "PC003";
+    pub const MISSING_DEPENDENCY: &str = "PC004";
+    pub const CIRCULAR_DEPENDENCY: &str = "PC005";
+    pub const HARDCODED_SECRET: &str = "PC006";
+    pub const SECRET_REFERENCE: &str = "PC007";
+    pub const UNDECLARED_ENV_VAR: &str = "PC008";
+    pub const UNPINNED_ACTION: &str = "PC009";
+    pub const DOCKER_LATEST_TAG: &str = "PC010";
+    pub const MISSING_TIMEOUT: &str = "PC011";
+    pub const MISSING_TRIGGER: &str = "PC012";
+    pub const MISSING_RUNS_ON: &str = "PC013";
+    pub const MISSING_PERMISSIONS: &str = "PC014";
+    pub const INVALID_YAML: &str = "PC015";
+    pub const CONCURRENCY_CANCEL_MISSING: &str = "PC016";
+    pub const CACHE_STATIC_KEY: &str = "PC017";
+    pub const ARTIFACT_NO_RETENTION: &str = "PC018";
 }
 
 impl Issue {
@@ -55,6 +80,30 @@ impl Issue {
                 job: Some(job_id.to_string()),
             }),
             suggestion,
+            rule_code: None,
+        }
+    }
+
+    /// Create an issue with location info and a rule code
+    pub fn for_job_with_code(
+        severity: Severity,
+        message: &str,
+        job_id: &str,
+        line: usize,
+        column: usize,
+        suggestion: Option<String>,
+        code: &'static str,
+    ) -> Self {
+        Issue {
+            severity,
+            message: message.to_string(),
+            location: Some(Location {
+                line,
+                column,
+                job: Some(job_id.to_string()),
+            }),
+            suggestion,
+            rule_code: Some(code),
         }
     }
 
@@ -65,6 +114,23 @@ impl Issue {
             message: message.to_string(),
             location: None,
             suggestion,
+            rule_code: None,
+        }
+    }
+
+    /// Create an issue without location, with a rule code
+    pub fn with_code(
+        severity: Severity,
+        message: &str,
+        suggestion: Option<String>,
+        code: &'static str,
+    ) -> Self {
+        Issue {
+            severity,
+            message: message.to_string(),
+            location: None,
+            suggestion,
+            rule_code: Some(code),
         }
     }
 }
@@ -285,6 +351,7 @@ mod tests {
                 job: Some("deploy".to_string()),
             }),
             suggestion: None,
+            rule_code: None,
         };
 
         assert_eq!(issue.location.as_ref().unwrap().line, 42);

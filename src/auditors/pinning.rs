@@ -7,7 +7,7 @@
 //! - Warns about Docker images using `:latest` tag in `services:` blocks
 
 use crate::error::Result;
-use crate::models::{Issue, Pipeline, Severity};
+use crate::models::{rule_codes, Issue, Pipeline, Severity};
 
 /// Audit a pipeline for action pinning and Docker image issues
 ///
@@ -24,7 +24,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
         if let Some(image) = &job.container_image {
             let (line, col) = pipeline.find_job_line(&job.id, "container");
             if image.ends_with(":latest") {
-                issues.push(Issue::for_job(
+                issues.push(Issue::for_job_with_code(
                     Severity::Warning,
                     &format!(
                         "Job '{}' uses :latest Docker image in container: {}",
@@ -34,9 +34,10 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                     line,
                     col,
                     Some("Pin to a specific image tag for reproducible builds".to_string()),
+                    rule_codes::DOCKER_LATEST_TAG,
                 ));
             } else if !image.contains(':') {
-                issues.push(Issue::for_job(
+                issues.push(Issue::for_job_with_code(
                     Severity::Warning,
                     &format!(
                         "Job '{}' uses Docker image without explicit tag in container: {}",
@@ -46,6 +47,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                     line,
                     col,
                     Some("Specify an explicit image tag (e.g. node:18-alpine)".to_string()),
+                    rule_codes::DOCKER_LATEST_TAG,
                 ));
             }
         }
@@ -54,7 +56,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
         for image in &job.service_images {
             let (line, col) = pipeline.find_job_line(&job.id, "services");
             if image.ends_with(":latest") {
-                issues.push(Issue::for_job(
+                issues.push(Issue::for_job_with_code(
                     Severity::Warning,
                     &format!(
                         "Job '{}' uses :latest Docker image in services: {}",
@@ -64,9 +66,10 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                     line,
                     col,
                     Some("Pin to a specific image tag for reproducible builds".to_string()),
+                    rule_codes::DOCKER_LATEST_TAG,
                 ));
             } else if !image.contains(':') {
-                issues.push(Issue::for_job(
+                issues.push(Issue::for_job_with_code(
                     Severity::Warning,
                     &format!(
                         "Job '{}' uses Docker service image without explicit tag: {}",
@@ -76,6 +79,7 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                     line,
                     col,
                     Some("Specify an explicit image tag".to_string()),
+                    rule_codes::DOCKER_LATEST_TAG,
                 ));
             }
         }
@@ -86,25 +90,27 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
                 let (line, col) = pipeline.find_job_line(&job.id, "uses");
                 // Check for :latest tag
                 if uses.contains(":latest") {
-                    issues.push(Issue::for_job(
+                    issues.push(Issue::for_job_with_code(
                         Severity::Warning,
                         &format!("Job '{}' uses :latest tag: {}", job.id, uses),
                         &job.id,
                         line,
                         col,
                         Some("Pin to a specific version for reproducible builds".to_string()),
+                        rule_codes::UNPINNED_ACTION,
                     ));
                 }
 
                 // Check for missing version in action references
                 if !uses.contains('@') && !uses.contains(':') {
-                    issues.push(Issue::for_job(
+                    issues.push(Issue::for_job_with_code(
                         Severity::Warning,
                         &format!("Job '{}' uses action without version: {}", job.id, uses),
                         &job.id,
                         line,
                         col,
                         Some("Specify a version with @v1 or @commit-sha".to_string()),
+                        rule_codes::UNPINNED_ACTION,
                     ));
                 }
             }

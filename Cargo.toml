@@ -1,6 +1,6 @@
 [package]
 name = "pipechecker"
-version = "0.2.10"
+version = "0.3.0"
 edition = "2021"
 authors = ["Pipecheck Contributors"]
 description = "CI/CD Pipeline Auditor - Catch errors before you push"
@@ -25,6 +25,7 @@ ratatui = "0.26"
 crossterm = "0.27"
 tokio = { version = "1.36", features = ["full"], optional = true }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
+notify = "8.2.0"
 
 [features]
 default = ["network"]
