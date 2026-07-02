@@ -9,6 +9,11 @@ ignore:
 
 # Rule configuration
 rules:
-  circular_dependencies: true  # Check for circular job dependencies
-  missing_secrets: true         # Warn about secrets usage
-  docker_latest_tag: true       # Warn about :latest Docker tags
+  circular_dependencies: true   # Check for circular job dependencies
+  missing_secrets: true          # Warn about secrets usage
+  docker_latest_tag: true        # Warn about :latest Docker tags
+  timeout_validation: true       # Warn about missing timeout-minutes
+  permissions_check: true        # Check for missing permissions blocks (GitHub Actions)
+  schema_validation: true        # Validate YAML structure against provider schema
+  concurrency_validation: true   # Check for concurrency group configuration
+  artifacts_check: true          # Check for artifact/cache best practices

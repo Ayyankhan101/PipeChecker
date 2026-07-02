@@ -1,7 +1,14 @@
-name: Test CI
-on: push
+name: Docker CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - run: echo test
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker build -t app:ci .
+      - run: docker run app:ci test

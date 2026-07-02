@@ -1,259 +1,191 @@
-# 🎯 Complete Publishing Guide
+# Pipechecker User Guide
 
-## What You've Built
+## Overview
 
-**Pipecheck** - A production-ready CI/CD pipeline auditor that:
-- ✅ Detects circular dependencies in workflows
-- ✅ Audits secrets usage
-- ✅ Validates Docker images
-- ✅ Supports GitHub Actions, GitLab CI, CircleCI
-- ✅ Outputs text or JSON
-- ✅ Cross-platform (Linux, macOS, Windows)
+Pipechecker is a CLI tool that validates CI/CD pipeline configurations locally. It catches errors before you push — saving CI minutes and developer frustration.
 
-**Real-world problem it solves:**
-Developers waste hours waiting for CI to fail, then debugging locally. Pipecheck catches errors BEFORE pushing, saving time and CI minutes.
+### Supported Platforms
 
----
+- **GitHub Actions** — `.github/workflows/*.yml`
+- **GitLab CI** — `.gitlab-ci.yml`
+- **CircleCI** — `.circleci/config.yml`
 
-## 🚀 Quick Start (Test Locally)
+## Installation
+
+### From Source (Cargo)
 
 ```bash
-# Run the quickstart script
-./quickstart.sh
-
-# Or manually:
-cargo build --release
-./target/release/pipecheck tests/fixtures/github/circular.yml
+cargo install pipechecker
 ```
 
----
-
-## 📦 Publishing to npm & crates.io
-
-### Step 1: Create GitHub Repository
-
-1. Go to https://github.com/new
-2. Name: `pipecheck`
-3. Description: "CI/CD Pipeline Auditor - Catch errors before you push"
-4. Make it public
-5. Don't initialize with README (we have one)
+### From npm
 
 ```bash
-# In your project directory
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/pipecheck.git
-git push -u origin main
+npm install -g pipechecker
 ```
 
-### Step 2: Update Repository URLs
+## Usage
 
-Edit these files and replace `yourusername` with your GitHub username:
-- `Cargo.toml` - line 7
-- `package.json` - line 18
-- `README.md` - badges at top
+### Basic
 
 ```bash
-# Quick find/replace
-sed -i 's/yourusername/YOUR_USERNAME/g' Cargo.toml package.json README.md
+pipechecker
 ```
 
-### Step 3: Create Accounts
+Auto-detects the first workflow file in your project and runs all auditors.
 
-**npm account:**
-1. Go to https://www.npmjs.com/signup
-2. Create account
-3. Verify email
-4. Go to https://www.npmjs.com/settings/tokens
-5. Generate "Automation" token
-6. Copy the token
-
-**crates.io account:**
-1. Go to https://crates.io
-2. Click "Log in with GitHub"
-3. Go to https://crates.io/me
-4. Generate API token
-5. Copy the token
-
-### Step 4: Add Secrets to GitHub
-
-1. Go to your GitHub repo
-2. Settings → Secrets and variables → Actions
-3. Click "New repository secret"
-4. Add these secrets:
-   - Name: `NPM_TOKEN`, Value: (paste npm token)
-   - Name: `CARGO_TOKEN`, Value: (paste crates.io token)
-
-### Step 5: Publish!
+### Check All Workflows
 
 ```bash
-# Make sure everything is committed
-git add .
-git commit -m "chore: prepare for release"
-git push
-
-# Create and push tag
-git tag v0.1.0
-git push origin v0.1.0
+pipechecker --all
 ```
 
-**That's it!** GitHub Actions will automatically:
-1. Build binaries for all platforms
-2. Create GitHub release
-3. Publish to npm
-4. Publish to crates.io
+Discovers all workflow files and audits every one.
 
-### Step 6: Verify
+### Check Specific File
 
-After ~10 minutes, check:
-- https://github.com/YOUR_USERNAME/pipecheck/releases
-- https://www.npmjs.com/package/pipecheck
-- https://crates.io/crates/pipecheck
-
----
-
-## 📢 Marketing Your Package
-
-### 1. Update GitHub Repository
-
-Add these topics to your repo (Settings → Topics):
-- `rust`
-- `ci-cd`
-- `github-actions`
-- `gitlab-ci`
-- `circleci`
-- `devops`
-- `pipeline`
-- `validation`
-
-### 2. Share on Social Media
-
-**Twitter/X:**
-```
-🚀 Just launched Pipecheck - a blazingly fast CI/CD pipeline auditor!
-
-Stop wasting time on CI failures. Catch circular dependencies, secrets issues, and config errors BEFORE you push.
-
-✅ GitHub Actions
-✅ GitLab CI  
-✅ CircleCI
-
-npm install -g pipecheck
-
-https://github.com/YOUR_USERNAME/pipecheck
+```bash
+pipechecker .github/workflows/deploy.yml
 ```
 
-**LinkedIn:**
-```
-I'm excited to share Pipecheck - an open-source tool I built to solve a problem every developer faces: debugging CI failures.
+### Diff Mode
 
-Pipecheck validates your CI/CD pipelines locally, catching errors before you push. It's saved me hours of waiting for CI to fail.
+Check only files changed since a base branch:
 
-Built with Rust for speed, supports GitHub Actions, GitLab CI, and CircleCI.
-
-Try it: npm install -g pipecheck
-
-#DevOps #CI #CD #OpenSource #Rust
+```bash
+pipechecker --diff --diff-branch main
 ```
 
-### 3. Post on Reddit
+## Flags
 
-**r/rust:**
-Title: "Pipecheck - CI/CD Pipeline Auditor written in Rust"
+| Flag | Description |
+|------|-------------|
+| `--all` | Check all discovered workflows |
+| `--strict` | Treat warnings as errors |
+| `--ci` | CI mode: `--quiet --strict --format json` |
+| `--quiet` | Only show errors |
+| `--verbose` | Show diagnostic info & auditor list |
+| `--format json` | JSON output |
+| `--diff` | Only check changed files |
+| `--diff-branch <name>` | Base branch for diff (default: main) |
+| `--watch` | Watch for changes and re-check |
+| `--tui` | Interactive terminal UI |
+| `--fix` | Auto-fix unpinned actions / Docker images |
+| `--no-pinning` | Skip action pinning checks |
+| `--no-permissions` | Skip permissions checks |
+| `--no-schema` | Skip schema validation |
+| `--explain <CODE>` | Show detailed explanation for a rule |
+| `--init --template <name>` | Scaffold a workflow from template |
+| `--install-hook` | Install git pre-commit hook |
+
+## Auditors
+
+### 1. Syntax Auditor (PC002-PC005)
+Checks for structural issues: empty pipelines, duplicate job IDs, jobs without steps, and missing dependency targets.
+
+### 2. DAG Auditor (PC001)
+Uses Tarjan's algorithm to detect circular job dependencies. Reports the exact cycle path with job names.
+
+### 3. Secrets Auditor (PC006-PC008)
+Scans environment variables at all levels (workflow, job, step) for hardcoded secrets, suspicious key names, and undeclared `${{ env.* }}` references.
+
+### 4. Pinning Auditor (PC009-PC010)
+Warns about GitHub Actions without a version pin (`@v4`, `@v3`, etc.) and Docker images using the `:latest` tag.
+
+### 5. Timeout Auditor (PC011)
+Warns when jobs lack `timeout-minutes` (GitHub), `timeout` (GitLab), or `max_time` (CircleCI).
+
+### 6. Permissions Auditor (PC014)
+Checks that GitHub Actions jobs have explicit `permissions:` blocks instead of inheriting repo-level defaults.
+
+### 7. Schema Auditor (PC012-PC013, PC015)
+Validates YAML structure against provider-specific expectations: required keys, valid job structures, and known keywords.
+
+### 8. Concurrency Auditor (PC016)
+Checks that jobs using `concurrency:` groups have `cancel-in-progress: true`.
+
+### 9. Artifacts Auditor (PC017)
+Checks for artifact retention configuration in GitHub Actions upload-artifact steps.
+
+## Configuration File
+
+Place `.pipecheckerrc.yml` in your project root:
+
+```yaml
+# Files/patterns to ignore
+ignore:
+  - .github/workflows/old-*.yml
+  - templates/
+
+# Rule toggles (all default to true)
+rules:
+  circular_dependencies: true
+  missing_secrets: true
+  docker_latest_tag: true
+  timeout_validation: true
+  permissions_check: true
+  schema_validation: true
+  concurrency_validation: true
+  artifacts_check: true
 ```
-I built a tool to validate CI/CD pipelines locally before pushing. It catches circular dependencies, secrets issues, and Docker problems.
 
-Written in Rust for speed, published to both crates.io and npm.
+## Auto-Fix
 
-Would love feedback from the Rust community!
+The `--fix` command pins unpinned GitHub Actions and Docker `:latest` tags to known safe versions:
 
-GitHub: https://github.com/YOUR_USERNAME/pipecheck
+- `actions/checkout` → `actions/checkout@v4`
+- `node:latest` → `node:20-alpine`
+- `postgres:latest` → `postgres:16-alpine`
+- And 20+ more mappings
+
+## Pre-commit Hook
+
+```bash
+pipechecker --install-hook
 ```
 
-**r/devops:**
-Title: "Tool to catch CI/CD errors before pushing"
-```
-Tired of waiting for CI to fail? I built Pipecheck to validate pipelines locally.
+Installs a hook that runs `pipechecker --all --strict` on staged workflow files before every commit.
 
-Supports GitHub Actions, GitLab CI, and CircleCI.
+## Release Process
 
-npm install -g pipecheck
-
-Open source and free!
-```
-
-### 4. Submit to Lists
-
-- https://github.com/rust-unofficial/awesome-rust
-- https://github.com/awesome-selfhosted/awesome-selfhosted
-- https://github.com/sindresorhus/awesome
-
-### 5. Write a Blog Post
-
-Title ideas:
-- "How I Built a CI/CD Auditor in Rust"
-- "Stop Wasting Time on CI Failures"
-- "Validating GitHub Actions Locally"
-
-Post on:
-- dev.to
-- Medium
-- Your personal blog
-- Hashnode
-
----
-
-## 📊 Track Success
-
-**npm downloads:**
-https://npm-stat.com/charts.html?package=pipecheck
-
-**crates.io downloads:**
-https://crates.io/crates/pipecheck
-
-**GitHub stars:**
-Watch your repo star count grow!
-
----
-
-## 🔄 Future Updates
-
-When you add features:
+### Creating a New Release
 
 1. Update version in `Cargo.toml` and `package.json`
 2. Update `CHANGELOG.md`
-3. Commit and tag:
+3. Commit and push:
+   ```bash
+   git add .
+   git commit -m "chore: bump to v0.X.Y"
+   git tag v0.X.Y
+   git push origin main --tags
+   ```
+4. GitHub Actions builds binaries, creates release, publishes to crates.io
+5. If npm publish fails, ensure `NPM_TOKEN` is an Automation token (2FA bypass)
+
+### Required GitHub Secrets
+
+- `NPM_TOKEN` — npm Automation token
+- `CARGO_TOKEN` — crates.io API token
+
+## Troubleshooting
+
+**`pipechecker` not found after npm install?**
+Ensure the npm global bin directory is in your `$PATH`.
+
+**Build fails?**
 ```bash
-git commit -am "feat: add new feature"
-git tag v0.2.0
-git push origin main --tags
+cargo clean
+cargo build --release
 ```
 
----
-
-## 💡 Feature Ideas for Future
-
-- Support for Jenkins, Travis CI, Azure Pipelines
-- VS Code extension
-- GitHub App for PR checks
-- Web UI for visualization
-- Performance benchmarks
-- More auditors (security, performance, cost)
+**Permission denied on pre-commit hook?**
+The hook is automatically made executable on Unix. On Windows, manually set permissions.
 
 ---
 
-## ❓ Need Help?
+## Further Reading
 
-- Check `PUBLISHING_CHECKLIST.md` for detailed steps
-- Open an issue on GitHub
-- Ask in Rust Discord: https://discord.gg/rust-lang
-
----
-
-## 🎉 Congratulations!
-
-You've built a real tool that solves a real problem. Now get it out there and help developers save time!
-
-Remember: Even if only 10 people use it, you've made their lives better. That's what open source is about. 🚀
+- `QUICK_REFERENCE.md` — Cheat sheet
+- `TUI_GUIDE.md` — Terminal UI usage
+- `docs/` — Full documentation
+- `pipechecker --help` — CLI reference

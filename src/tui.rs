@@ -319,7 +319,7 @@ mod tests {
         AuditResult {
             provider: Provider::GitHubActions,
             issues,
-            summary: format!("0 errors, 0 warnings"),
+            summary: "0 errors, 0 warnings".to_string(),
             elapsed: std::time::Duration::from_millis(0),
         }
     }
@@ -470,7 +470,7 @@ mod tests {
         let result = make_result(vec![issue]);
         let app = make_app(vec!["loc.yml"], vec![Some(result)]);
 
-        if let Some(Some(r)) = app.results.get(0) {
+        if let Some(Some(r)) = app.results.first() {
             assert_eq!(r.issues[0].location.as_ref().unwrap().line, 10);
         }
     }

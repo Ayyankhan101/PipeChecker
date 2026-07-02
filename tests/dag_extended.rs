@@ -118,10 +118,6 @@ fn test_four_node_cycle() {
 
     let issues = dag::audit(&pipeline).unwrap();
     assert!(!issues.is_empty());
-    // Ensure all four jobs are part of the reported cycle? Not necessarily, but at least some are reported.
-    // We can check that there are 4 jobs in the cycle? The auditor might report one issue per cycle or per node.
-    // Current implementation: pushes an issue per node in a cycle? Let's check dag::audit logic later. For now ensure non-empty.
-    assert!(issues.len() >= 1);
 }
 
 #[test]

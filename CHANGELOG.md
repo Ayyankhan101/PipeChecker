@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-07-02
+
+### Changed
+- Updated templates (rust, node, docker, gitlab-node) with real multi-job workflows
+- Rewrote START_HERE.md, COMPLETE_GUIDE.md, QUICK_REFERENCE.md for v0.3.x accuracy
+- Updated `.pipecheckrc.example.yml` with all 8 rule fields
+- Cleaned up IMPROVEMENTS.md — removed stale "new!" markers, accurate status
+- Fixed binary name references (`pipecheck` → `pipechecker`) in docs
+- Added missing flags to documentation (--ci, --diff, --fix, --explain, --init, --no-permissions, --no-schema, --verbose, --quiet)
+
+### Fixed
+- npm publish: requires Automation token with 2FA bypass
+
+[0.3.1]: https://github.com/Ayyankhan101/PipeCheck/compare/v0.3.0...v0.3.1
+
 ## [0.3.0] - 2026-06-27
 
 ### Added

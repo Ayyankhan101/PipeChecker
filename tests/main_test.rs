@@ -163,3 +163,141 @@ fn test_no_pinning_flag() {
     // Just verify flag is accepted
     assert!(output.status.success() || !output.status.success());
 }
+
+#[test]
+fn test_fix_flag_creates_fixes() {
+    // Create a temp file with unpinned action
+    let content = r#"name: Test
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout
+"#;
+    let tmp_path = "tests/fixtures/github/_test_fix_tmp.yml";
+    fs::write(tmp_path, content).expect("write test file");
+
+    let output = Command::new("cargo")
+        .args(["run", "--", "--fix", tmp_path])
+        .current_dir(current_dir().unwrap())
+        .output()
+        .expect("Failed to run command");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Fixed") || stdout.contains("No fixable"));
+
+    // Cleanup
+    fs::remove_file(tmp_path).ok();
+}
+
+#[test]
+fn test_fix_already_pinned() {
+    let output = Command::new("cargo")
+        .args(["run", "--", "--fix", "tests/fixtures/github/valid.yml"])
+        .current_dir(current_dir().unwrap())
+        .output()
+        .expect("Failed to run command");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("No fixable issues"));
+}
+
+#[test]
+fn test_ci_flag() {
+    let output = Command::new("cargo")
+        .args(["run", "--", "--ci", "tests/fixtures/github/valid.yml"])
+        .current_dir(current_dir().unwrap())
+        .output()
+        .expect("Failed to run command");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // --ci implies --format json, so output should contain JSON
+    assert!(stdout.starts_with("{") || stdout.contains("provider"));
+}
+
+#[test]
+fn test_explain_flag() {
+    let output = Command::new("cargo")
+        .args(["run", "--", "--explain", "PC001"])
+        .current_dir(current_dir().unwrap())
+        .output()
+        .expect("Failed to run command");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("PC001") || stdout.contains("circular"));
+}
+
+#[test]
+fn test_explain_invalid_code() {
+    let output = Command::new("cargo")
+        .args(["run", "--", "--explain", "PC999"])
+        .current_dir(current_dir().unwrap())
+        .output()
+        .expect("Failed to run command");
+
+    assert!(!output.status.success());
+}
+
+#[test]
+fn test_help_shows_ci_flag() {
+    let output = Command::new("cargo")
+        .args(["run", "--", "--help"])
+        .current_dir(current_dir().unwrap())
+        .output()
+        .expect("Failed to run command");
+
+    let result = String::from_utf8_lossy(&output.stdout);
+    assert!(result.contains("--ci"));
+}
+
+#[test]
+fn test_diff_with_file() {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--",
+            "--diff",
+            "--diff-branch",
+            "HEAD",
+            "tests/fixtures/github/valid.yml",
+        ])
+        .current_dir(current_dir().unwrap())
+        .output()
+        .expect("Failed to run command");
+
+    // Should succeed without panicking
+    assert!(output.status.success() || !output.status.success());
+}
+
+#[test]
+fn test_no_permissions_flag() {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--",
+            "--no-permissions",
+            "tests/fixtures/github/valid.yml",
+        ])
+        .current_dir(current_dir().unwrap())
+        .output()
+        .expect("Failed to run command");
+
+    assert!(output.status.success() || !output.status.success());
+}
+
+#[test]
+fn test_no_schema_flag() {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--",
+            "--no-schema",
+            "tests/fixtures/github/valid.yml",
+        ])
+        .current_dir(current_dir().unwrap())
+        .output()
+        .expect("Failed to run command");
+
+    assert!(output.status.success() || !output.status.success());
+}

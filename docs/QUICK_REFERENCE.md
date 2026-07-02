@@ -1,195 +1,186 @@
-# 📋 Pipecheck Quick Reference
+# Pipechecker Quick Reference
 
 ## Installation
 
 ```bash
 # Via Cargo
-cargo install pipecheck
+cargo install pipechecker
 
-# Via npm (once published)
-npm install -g pipecheck
+# Via npm
+npm install -g pipechecker
 ```
 
 ## Basic Commands
 
 | Command | Description |
 |---------|-------------|
-| `pipecheck` | Auto-detect and check workflow |
-| `pipecheck file.yml` | Check specific file |
-| `pipecheck --all` | Check all workflows |
-| `pipecheck --tui` | Interactive terminal UI |
-| `pipecheck --version` | Show version |
-| `pipecheck --help` | Show help |
+| `pipechecker` | Auto-detect and check workflow |
+| `pipechecker <file>` | Check specific file |
+| `pipechecker --all` | Check all workflows |
+| `pipechecker --tui` | Interactive terminal UI |
+| `pipechecker --version` | Show version |
+| `pipechecker --help` | Show help |
 
-## Interactive Features
+## Interactive & Dev Features
 
 | Command | Description |
 |---------|-------------|
-| `pipecheck --install-hook` | Install pre-commit hook |
-| `pipecheck --watch` | Watch for file changes |
-| `pipecheck --tui` | Interactive TUI mode |
+| `pipechecker --install-hook` | Install pre-commit hook |
+| `pipechecker --watch` | Watch for file changes |
+| `pipechecker --tui` | Interactive TUI mode |
 
 ## Output Options
 
 | Command | Description |
 |---------|-------------|
-| `pipecheck --format json` | JSON output |
-| `pipecheck --strict` | Warnings as errors |
-| `pipecheck --no-docker` | Skip Docker checks |
+| `pipechecker --format json` | JSON output |
+| `pipechecker --strict` | Warnings as errors |
+| `pipechecker --ci` | CI mode (--quiet --strict --format json) |
+| `pipechecker --quiet` | Suppress warnings/info |
+| `pipechecker --verbose` | Show diagnostic info |
+| `pipechecker --no-pinning` | Skip Docker/action pin checks |
+| `pipechecker --no-permissions` | Skip permissions checks |
+| `pipechecker --no-schema` | Skip schema validation |
+| `pipechecker --explain PC005` | Explain a rule code |
+
+## Diff & Init
+
+| Command | Description |
+|---------|-------------|
+| `pipechecker --diff` | Check files changed since base branch |
+| `pipechecker --diff --diff-branch main` | Compare against main |
+| `pipechecker --init --template rust` | Scaffold a workflow template |
+| `pipechecker --fix` | Auto-fix pinning issues |
 
 ## TUI Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
-| `↑` / `k` | Move up |
-| `↓` / `j` | Move down |
+| `up` / `k` | Move up |
+| `down` / `j` | Move down |
 | `Enter` / `Space` | Toggle details |
 | `q` / `Esc` | Quit |
 
 ## Configuration File
 
-Create `.pipecheckrc.yml`:
+Create `.pipecheckerrc.yml`:
 
 ```yaml
 ignore:
   - .github/workflows/old-*.yml
-  - .github/workflows/experimental/
 
 rules:
   circular_dependencies: true
   missing_secrets: true
   docker_latest_tag: true
+  timeout_validation: true
+  permissions_check: true
+  schema_validation: true
+  concurrency_validation: true
+  artifacts_check: true
 ```
 
 ## Common Workflows
 
 ### Quick Check
 ```bash
-pipecheck
+pipechecker
 ```
 
 ### Check All Before Commit
 ```bash
-pipecheck --all --strict
+pipechecker --all --strict
 ```
 
 ### Interactive Exploration
 ```bash
-pipecheck --tui
+pipechecker --tui
 ```
 
 ### Development with Auto-reload
 ```bash
-pipecheck --watch
+pipechecker --watch
 ```
 
 ### CI Integration
 ```bash
-pipecheck --all --format json --strict
+pipechecker --ci
 ```
+
+### Check Only Changed Files
+```bash
+pipechecker --diff
+```
+
+## Rule Codes
+
+| Code | Auditor | Description |
+|------|---------|-------------|
+| PC001 | DAG | Circular dependency detected |
+| PC002 | Syntax | Empty pipeline (no jobs) |
+| PC003 | Syntax | Duplicate job ID |
+| PC004 | Syntax | Job with no steps |
+| PC005 | Syntax | Missing dependency target |
+| PC006 | Secrets | Hardcoded secret in env |
+| PC007 | Secrets | Undeclared env var reference |
+| PC008 | Secrets | Suspicious key-value pair |
+| PC009 | Pinning | Unpinned action |
+| PC010 | Pinning | Docker image using :latest |
+| PC011 | Timeout | Job missing timeout-minutes |
+| PC012 | Schema | Missing required top-level key |
+| PC013 | Schema | Invalid job structure |
+| PC014 | Permissions | Missing permissions block |
+| PC015 | Schema | Unknown top-level key |
+| PC016 | Concurrency | Missing cancel-in-progress |
+| PC017 | Artifacts | Missing artifact retention config |
+| PC018 | Include | Uses GitLab include blocks |
 
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | `0` | No errors |
-| `1` | Errors found |
-| `1` | Warnings found (in strict mode) |
-
-## Status Indicators
-
-| Symbol | Meaning |
-|--------|---------|
-| ✅ | No issues |
-| ⚠️ | Warnings |
-| ❌ | Errors |
-| ℹ️ | Info |
+| `1` | Errors found (or warnings in strict mode) |
 
 ## Supported Platforms
 
-- ✅ GitHub Actions (`.github/workflows/*.yml`)
-- ✅ GitLab CI (`.gitlab-ci.yml`)
-- ✅ CircleCI (`.circleci/config.yml`)
-
-## Examples
-
-### Example 1: Quick Validation
-```bash
-$ pipecheck
-✓ Auto-detected: .github/workflows/ci.yml
-Provider: GitHubActions
-0 errors, 0 warnings
-```
-
-### Example 2: Multiple Files
-```bash
-$ pipecheck --all
-Checking 3 workflow file(s)...
-
-📄 .github/workflows/ci.yml
-   ✅ No issues found
-
-📄 .github/workflows/deploy.yml
-   ✅ No issues found
-
-Total: 0 errors, 0 warnings across 3 files
-```
-
-### Example 3: Error Detection
-```bash
-$ pipecheck broken.yml
-Provider: GitHubActions
-
-1 errors, 0 warnings
-
-❌ ERROR: Circular dependency detected: job-a -> job-b -> job-c
-   💡 Remove one of the dependencies to break the cycle
-```
-
-### Example 4: JSON Output
-```bash
-$ pipecheck --format json
-{
-  "provider": "GitHubActions",
-  "issues": [],
-  "summary": "0 errors, 0 warnings"
-}
-```
+- GitHub Actions (`.github/workflows/*.yml`)
+- GitLab CI (`.gitlab-ci.yml`)
+- CircleCI (`.circleci/config.yml`)
 
 ## Tips
 
 1. **Install pre-commit hook** for automatic validation
    ```bash
-   pipecheck --install-hook
+   pipechecker --install-hook
    ```
 
 2. **Use watch mode** during development
    ```bash
-   pipecheck --watch
+   pipechecker --watch
    ```
 
 3. **Use TUI** for exploring multiple workflows
    ```bash
-   pipecheck --tui
+   pipechecker --tui
    ```
 
-4. **Add config file** for team standards
+4. **Use strict mode** in CI
    ```bash
-   echo "ignore: [.github/workflows/old-*.yml]" > .pipecheckrc.yml
+   pipechecker --ci
    ```
 
-5. **Use strict mode** in CI
+5. **Check only changed files** against main
    ```bash
-   pipecheck --all --strict
+   pipechecker --diff --diff-branch main
    ```
 
 ## Getting Help
 
-- Documentation: See `README.md`
-- TUI Guide: See `TUI_GUIDE.md`
+- Documentation: See `docs/`
 - Issues: https://github.com/Ayyankhan101/PipeCheck/issues
-- Help: `pipecheck --help`
+- Help: `pipechecker --help`
 
 ---
 
-**Pipecheck v0.2.0 - Catch CI/CD errors before you push! 🚀**
+**Pipechecker v0.3.0 — Catch CI/CD errors before you push!**
