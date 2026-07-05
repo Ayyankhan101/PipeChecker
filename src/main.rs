@@ -1048,3 +1048,521 @@ fn audit_all_workflows(
         process::exit(1);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pipechecker::{Issue, Severity};
+
+    // --- format_sarif tests ---
+
+    fn make_test_result(issues: Vec<Issue>) -> pipechecker::AuditResult {
+        pipechecker::AuditResult {
+            provider: pipechecker::models::Provider::GitHubActions,
+            issues,
+            summary: "test".to_string(),
+            elapsed: std::time::Duration::from_millis(0),
+        }
+    }
+
+    #[test]
+    fn test_format_sarif_empty() {
+        let result = make_test_result(vec![]);
+        let sarif = format_sarif(&result, "ci.yml");
+        let parsed: serde_json::Value = serde_json::from_str(&sarif).unwrap();
+        assert_eq!(parsed["version"], "2.1.0");
+        assert_eq!(parsed["runs"][0]["results"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn test_format_sarif_with_error() {
+        let issue = Issue::for_job_with_code(
+            Severity::Error,
+            "test error",
+            "build",
+            10,
+            3,
+            Some("fix it".to_string()),
+            "PC001",
+        );
+        let result = make_test_result(vec![issue]);
+        let sarif = format_sarif(&result, "ci.yml");
+        let parsed: serde_json::Value = serde_json::from_str(&sarif).unwrap();
+        let results = parsed["runs"][0]["results"].as_array().unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0]["ruleId"], "PC001");
+        assert_eq!(results[0]["level"], "error");
+        assert_eq!(results[0]["message"]["text"], "test error");
+        assert_eq!(
+            results[0]["locations"][0]["physicalLocation"]["region"]["startLine"],
+            10
+        );
+        assert_eq!(
+            results[0]["locations"][0]["physicalLocation"]["region"]["startColumn"],
+            3
+        );
+        assert_eq!(
+            results[0]["fixes"][0]["description"]["text"],
+            "fix it"
+        );
+    }
+
+    #[test]
+    fn test_format_sarif_warning() {
+        let issue = Issue::for_job_with_code(
+            Severity::Warning,
+            "test warning",
+            "build",
+            5,
+            1,
+            None,
+            "PC009",
+        );
+        let result = make_test_result(vec![issue]);
+        let sarif = format_sarif(&result, "test.yml");
+        let parsed: serde_json::Value = serde_json::from_str(&sarif).unwrap();
+        let r = &parsed["runs"][0]["results"][0];
+        assert_eq!(r["level"], "warning");
+        assert_eq!(r["ruleId"], "PC009");
+    }
+
+    #[test]
+    fn test_format_sarif_info() {
+        let issue = Issue::new(Severity::Info, "info message", None);
+        let result = make_test_result(vec![issue]);
+        let sarif = format_sarif(&result, "test.yml");
+        let parsed: serde_json::Value = serde_json::from_str(&sarif).unwrap();
+        assert_eq!(parsed["runs"][0]["results"][0]["level"], "note");
+    }
+
+    #[test]
+    fn test_format_sarif_no_location() {
+        let issue = Issue::with_code(
+            Severity::Error,
+            "no location",
+            None,
+            "PC001",
+        );
+        let result = make_test_result(vec![issue]);
+        let sarif = format_sarif(&result, "test.yml");
+        let parsed: serde_json::Value = serde_json::from_str(&sarif).unwrap();
+        let loc = &parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"];
+        assert_eq!(loc["artifactLocation"]["uri"], "test.yml");
+        // No region when line == 0
+        assert!(loc.get("region").is_none());
+    }
+
+    #[test]
+    fn test_format_sarif_no_rule_code() {
+        let issue = Issue::new(Severity::Error, "no code", None);
+        let result = make_test_result(vec![issue]);
+        let sarif = format_sarif(&result, "test.yml");
+        let parsed: serde_json::Value = serde_json::from_str(&sarif).unwrap();
+        assert_eq!(parsed["runs"][0]["results"][0]["ruleId"], "PC000");
+    }
+
+    // --- Cli effective_* tests ---
+
+    #[test]
+    fn test_cli_effective_quiet_default() {
+        let cli = Cli {
+            file: None,
+            all: false,
+            install_hook: false,
+            watch: false,
+            fix: false,
+            fix_dry_run: false,
+            tui: false,
+            format: "text".to_string(),
+            no_pinning: false,
+            strict: false,
+            quiet: false,
+            verbose: false,
+            ci: false,
+            diff: false,
+            diff_branch: "main".to_string(),
+            init: false,
+            template: None,
+            force: false,
+            no_permissions: false,
+            no_schema: false,
+            explain: None,
+            config: None,
+            command: None,
+        };
+        assert!(!cli.effective_quiet());
+        assert!(!cli.effective_strict());
+        assert_eq!(cli.effective_format(), "text");
+    }
+
+    #[test]
+    fn test_cli_effective_ci_mode() {
+        let cli = Cli {
+            file: None,
+            all: false,
+            install_hook: false,
+            watch: false,
+            fix: false,
+            fix_dry_run: false,
+            tui: false,
+            format: "text".to_string(),
+            no_pinning: false,
+            strict: false,
+            quiet: false,
+            verbose: false,
+            ci: true,
+            diff: false,
+            diff_branch: "main".to_string(),
+            init: false,
+            template: None,
+            force: false,
+            no_permissions: false,
+            no_schema: false,
+            explain: None,
+            config: None,
+            command: None,
+        };
+        assert!(cli.effective_quiet());
+        assert!(cli.effective_strict());
+        assert_eq!(cli.effective_format(), "json");
+    }
+
+    #[test]
+    fn test_cli_effective_quiet_flag() {
+        let cli = Cli {
+            file: None,
+            all: false,
+            install_hook: false,
+            watch: false,
+            fix: false,
+            fix_dry_run: false,
+            tui: false,
+            format: "text".to_string(),
+            no_pinning: false,
+            strict: false,
+            quiet: true,
+            verbose: false,
+            ci: false,
+            diff: false,
+            diff_branch: "main".to_string(),
+            init: false,
+            template: None,
+            force: false,
+            no_permissions: false,
+            no_schema: false,
+            explain: None,
+            config: None,
+            command: None,
+        };
+        assert!(cli.effective_quiet());
+        assert!(!cli.effective_strict());
+        assert_eq!(cli.effective_format(), "text");
+    }
+
+    #[test]
+    fn test_cli_effective_strict_flag() {
+        let cli = Cli {
+            file: None,
+            all: false,
+            install_hook: false,
+            watch: false,
+            fix: false,
+            fix_dry_run: false,
+            tui: false,
+            format: "sarif".to_string(),
+            no_pinning: false,
+            strict: true,
+            quiet: false,
+            verbose: false,
+            ci: false,
+            diff: false,
+            diff_branch: "main".to_string(),
+            init: false,
+            template: None,
+            force: false,
+            no_permissions: false,
+            no_schema: false,
+            explain: None,
+            config: None,
+            command: None,
+        };
+        assert!(!cli.effective_quiet());
+        assert!(cli.effective_strict());
+        assert_eq!(cli.effective_format(), "sarif");
+    }
+
+    // --- load_config_rules tests ---
+
+    #[test]
+    fn test_load_config_rules_defaults() {
+        let cli = Cli {
+            file: None,
+            all: false,
+            install_hook: false,
+            watch: false,
+            fix: false,
+            fix_dry_run: false,
+            tui: false,
+            format: "text".to_string(),
+            no_pinning: false,
+            strict: false,
+            quiet: false,
+            verbose: false,
+            ci: false,
+            diff: false,
+            diff_branch: "main".to_string(),
+            init: false,
+            template: None,
+            force: false,
+            no_permissions: false,
+            no_schema: false,
+            explain: None,
+            config: None,
+            command: None,
+        };
+        let rules = load_config_rules(&cli);
+        assert!(rules.permissions_check);
+        assert!(rules.schema_validation);
+    }
+
+    #[test]
+    fn test_load_config_rules_no_permissions() {
+        let cli = Cli {
+            file: None,
+            all: false,
+            install_hook: false,
+            watch: false,
+            fix: false,
+            fix_dry_run: false,
+            tui: false,
+            format: "text".to_string(),
+            no_pinning: false,
+            strict: false,
+            quiet: false,
+            verbose: false,
+            ci: false,
+            diff: false,
+            diff_branch: "main".to_string(),
+            init: false,
+            template: None,
+            force: false,
+            no_permissions: true,
+            no_schema: false,
+            explain: None,
+            config: None,
+            command: None,
+        };
+        let rules = load_config_rules(&cli);
+        assert!(!rules.permissions_check);
+        assert!(rules.schema_validation);
+    }
+
+    #[test]
+    fn test_load_config_rules_no_schema() {
+        let cli = Cli {
+            file: None,
+            all: false,
+            install_hook: false,
+            watch: false,
+            fix: false,
+            fix_dry_run: false,
+            tui: false,
+            format: "text".to_string(),
+            no_pinning: false,
+            strict: false,
+            quiet: false,
+            verbose: false,
+            ci: false,
+            diff: false,
+            diff_branch: "main".to_string(),
+            init: false,
+            template: None,
+            force: false,
+            no_permissions: false,
+            no_schema: true,
+            explain: None,
+            config: None,
+            command: None,
+        };
+        let rules = load_config_rules(&cli);
+        assert!(rules.permissions_check);
+        assert!(!rules.schema_validation);
+    }
+
+    #[test]
+    fn test_load_config_rules_from_file() {
+        let dir = std::env::temp_dir().join("pipechecker_test_cli_config");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.yml");
+        std::fs::write(
+            &path,
+            "rules:\n  permissions_check: false\n  schema_validation: false\n",
+        )
+        .unwrap();
+
+        let cli = Cli {
+            file: None,
+            all: false,
+            install_hook: false,
+            watch: false,
+            fix: false,
+            fix_dry_run: false,
+            tui: false,
+            format: "text".to_string(),
+            no_pinning: false,
+            strict: false,
+            quiet: false,
+            verbose: false,
+            ci: false,
+            diff: false,
+            diff_branch: "main".to_string(),
+            init: false,
+            template: None,
+            force: false,
+            no_permissions: false,
+            no_schema: false,
+            explain: None,
+            config: Some(path.to_str().unwrap().to_string()),
+            command: None,
+        };
+        let rules = load_config_rules(&cli);
+        assert!(!rules.permissions_check);
+        assert!(!rules.schema_validation);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // --- print_issue tests ---
+
+    #[test]
+    fn test_print_issue_error() {
+        let issue = Issue::for_job_with_code(
+            Severity::Error,
+            "test error",
+            "build",
+            10,
+            3,
+            Some("fix it".to_string()),
+            "PC001",
+        );
+        // Just verify it doesn't panic
+        print_issue(&issue, false);
+    }
+
+    #[test]
+    fn test_print_issue_quiet_skips_non_error() {
+        let issue = Issue::new(Severity::Warning, "warning", None);
+        // quiet=true should skip non-error issues without panicking
+        print_issue(&issue, true);
+    }
+
+    #[test]
+    fn test_print_issue_quiet_shows_error() {
+        let issue = Issue::new(Severity::Error, "error", None);
+        // quiet=true should still show errors
+        print_issue(&issue, true);
+    }
+
+    #[test]
+    fn test_print_issue_no_location() {
+        let issue = Issue::new(Severity::Info, "info", None);
+        print_issue(&issue, false);
+    }
+
+    #[test]
+    fn test_print_issue_with_location_no_line() {
+        let issue = Issue {
+            severity: Severity::Warning,
+            message: "test".to_string(),
+            location: Some(pipechecker::models::Location {
+                line: 0,
+                column: 0,
+                job: None,
+            }),
+            suggestion: None,
+            rule_code: None,
+        };
+        print_issue(&issue, false);
+    }
+
+    // --- explain_rule tests ---
+
+    #[test]
+    fn test_explain_all_rule_codes() {
+        let codes = [
+            "PC001", "PC002", "PC003", "PC004", "PC005", "PC006", "PC007", "PC008",
+            "PC009", "PC010", "PC011", "PC012", "PC013", "PC014", "PC015", "PC016",
+            "PC017", "PC018", "PC019", "PC020", "PC021", "PC022", "PC023", "PC024",
+        ];
+        for code in &codes {
+            // Should not panic for any valid code
+            explain_rule(code);
+        }
+    }
+
+    #[test]
+    fn test_explain_rule_case_insensitive() {
+        // lowercase should also work (to_uppercase is called)
+        explain_rule("pc001");
+    }
+
+    // --- run_audits_on_files tests ---
+
+    #[test]
+    fn test_run_audits_on_files_valid() {
+        let files = vec!["tests/fixtures/github/valid.yml".to_string()];
+        let options = AuditOptions::default();
+        let has_error = run_audits_on_files(&files, options, false, false);
+        assert!(!has_error);
+    }
+
+    #[test]
+    fn test_run_audits_on_files_nonexistent() {
+        let files = vec!["nonexistent.yml".to_string()];
+        let options = AuditOptions::default();
+        let has_error = run_audits_on_files(&files, options, false, false);
+        assert!(has_error);
+    }
+
+    #[test]
+    fn test_run_audits_on_files_empty() {
+        let files = vec![];
+        let options = AuditOptions::default();
+        let has_error = run_audits_on_files(&files, options, false, false);
+        assert!(!has_error);
+    }
+
+    #[test]
+    fn test_run_audits_on_files_strict_with_warnings() {
+        let files = vec!["tests/fixtures/github/valid.yml".to_string()];
+        let options = AuditOptions::default();
+        let has_error = run_audits_on_files(&files, options, false, true);
+        // strict mode: warnings cause failure
+        // result depends on whether valid.yml has warnings
+        let _ = has_error;
+    }
+
+    #[test]
+    fn test_run_audits_on_files_quiet() {
+        let files = vec!["tests/fixtures/github/valid.yml".to_string()];
+        let options = AuditOptions::default();
+        let has_error = run_audits_on_files(&files, options, true, false);
+        let _ = has_error;
+    }
+
+    // --- get_changed_workflows tests ---
+
+    #[test]
+    fn test_get_changed_workflows_invalid_branch() {
+        let files = get_changed_workflows("nonexistent_branch_xyz");
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn test_get_changed_workflows_main() {
+        // In a git repo, this should return some files or empty
+        let files = get_changed_workflows("main");
+        // Just verify it doesn't panic
+        let _ = files;
+    }
+}
