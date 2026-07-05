@@ -97,6 +97,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: "stages: [build]\nbuild: script: echo hi\n".to_string(),
+            is_reusable: false,
+            workflow_call_inputs: Vec::new(),
+            workflow_call_secrets: Vec::new(),
+            workflow_rules: Vec::new(),
         };
 
         let issues = audit(&pipeline).unwrap();
@@ -110,6 +114,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: "jobs:\n  build:\n    runs-on: ubuntu\n".to_string(),
+            is_reusable: false,
+            workflow_call_inputs: Vec::new(),
+            workflow_call_secrets: Vec::new(),
+            workflow_rules: Vec::new(),
         };
 
         let issues = audit(&pipeline).unwrap();

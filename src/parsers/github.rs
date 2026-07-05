@@ -24,6 +24,50 @@ struct GitHubWorkflow {
     env: Option<HashMap<String, serde_yaml::Value>>,
 }
 
+/// Detect and parse `on: workflow_call` trigger for reusable workflows (task 2.5)
+///
+/// Returns (is_reusable, inputs, secrets).
+fn parse_workflow_call(on_val: &Value) -> (bool, Vec<String>, Vec<String>) {
+    let on_map = match on_val.as_mapping() {
+        Some(m) => m,
+        None => return (false, vec![], vec![]),
+    };
+
+    let workflow_call_val = match on_map.get("workflow_call") {
+        Some(v) => v,
+        None => return (false, vec![], vec![]),
+    };
+
+    let wc_map = match workflow_call_val.as_mapping() {
+        Some(m) => m,
+        None => return (true, vec![], vec![]), // `on: workflow_call` with no config
+    };
+
+    // Parse inputs
+    let inputs = wc_map
+        .get("inputs")
+        .and_then(|v| v.as_mapping())
+        .map(|m| {
+            m.keys()
+                .filter_map(|k| k.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Parse secrets
+    let secrets = wc_map
+        .get("secrets")
+        .and_then(|v| v.as_mapping())
+        .map(|m| {
+            m.keys()
+                .filter_map(|k| k.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    (true, inputs, secrets)
+}
+
 /// Parse GitHub Actions workflow YAML content
 ///
 /// Converts GitHub Actions syntax to the common Pipeline model.
@@ -31,6 +75,10 @@ struct GitHubWorkflow {
 /// Populates `container_image`, `service_images`, and `with_inputs` fields.
 pub fn parse(content: &str) -> Result<Pipeline> {
     let workflow: GitHubWorkflow = serde_yaml::from_str(content)?;
+
+    // Parse reusable workflow info (task 2.5)
+    let (is_reusable, workflow_call_inputs, workflow_call_secrets) =
+        parse_workflow_call(&workflow.on);
 
     let mut jobs = Vec::new();
 
@@ -148,6 +196,7 @@ pub fn parse(content: &str) -> Result<Pipeline> {
             container_image,
             service_images,
             timeout_minutes,
+            rules: Vec::new(),
         });
     }
 
@@ -162,6 +211,10 @@ pub fn parse(content: &str) -> Result<Pipeline> {
                 .as_ref(),
         ),
         source: content.to_string(),
+        is_reusable,
+        workflow_call_inputs,
+        workflow_call_secrets,
+        workflow_rules: Vec::new(),
     })
 }
 

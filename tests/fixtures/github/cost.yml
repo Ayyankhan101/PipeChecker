@@ -1,0 +1,20 @@
+name: Cost Example
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  long-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "This job has an excessive timeout"
+
+  quick-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "This job is fine"

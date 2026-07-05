@@ -1,0 +1,36 @@
+name: Matrix CI
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [14, 16, 18, 20]
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Building on ${{ matrix.os }} with Node ${{ matrix.node-version }}"
+
+  test-large:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+        suite: [unit, integration, e2e]
+    steps:
+      - run: echo "Running shard ${{ matrix.shard }} for ${{ matrix.suite }}"
+
+  test-empty-include:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: []
+    steps:
+      - run: echo "empty include"
+
+  test-no-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no matrix here"

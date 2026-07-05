@@ -62,9 +62,14 @@ mod tests {
                 container_image: None,
                 service_images: vec![],
                 timeout_minutes: None,
+                rules: vec![],
             }],
             env: vec![],
             source: "jobs:\n  build:\n    steps:\n      - run: echo hi\n".to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
         };
 
         let issues = audit(&pipeline).unwrap();
@@ -86,9 +91,14 @@ mod tests {
                 container_image: None,
                 service_images: vec![],
                 timeout_minutes: Some(30),
+                rules: vec![],
             }],
             env: vec![],
             source: "jobs:\n  build:\n    timeout-minutes: 30\n    steps: []\n".to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
         };
 
         let issues = audit(&pipeline).unwrap();
@@ -109,6 +119,7 @@ mod tests {
                     container_image: None,
                     service_images: vec![],
                     timeout_minutes: Some(15),
+                    rules: vec![],
                 },
                 crate::models::Job {
                     id: "deploy".to_string(),
@@ -119,11 +130,16 @@ mod tests {
                     container_image: None,
                     service_images: vec![],
                     timeout_minutes: None,
+                    rules: vec![],
                 },
             ],
             env: vec![],
             source: "jobs:\n  build:\n    timeout-minutes: 15\n  deploy:\n    needs: [build]\n"
                 .to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
         };
 
         let issues = audit(&pipeline).unwrap();

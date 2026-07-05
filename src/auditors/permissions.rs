@@ -137,6 +137,10 @@ jobs:
             jobs: vec![],
             env: vec![],
             source: String::new(),
+            is_reusable: false,
+            workflow_call_inputs: Vec::new(),
+            workflow_call_secrets: Vec::new(),
+            workflow_rules: Vec::new(),
         };
         let issues = audit(&pipeline).unwrap();
         assert!(issues.is_empty());

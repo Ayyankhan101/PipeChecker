@@ -9,9 +9,13 @@
 //! - Docker image references via `image` keyword
 //! - Service definitions
 //! - `include` block parsing (local + remote detection)
+//! - `extends:` support with shallow merge semantics
+//! - Hidden job filtering (keys starting with `.`)
+//! - `rules:` block parsing per job
+//! - Top-level `workflow:rules:` parsing
 
 use crate::error::Result;
-use crate::models::{EnvVar, Job, Pipeline, Provider, Step};
+use crate::models::{EnvVar, Job, Pipeline, Provider, RuleCondition, Step};
 use serde_yaml::Value;
 
 /// Information about included files from `include:` blocks
@@ -23,6 +27,144 @@ pub struct IncludeInfo {
     pub remote: Vec<String>,
     /// Project-based includes (project::path)
     pub project: Vec<String>,
+}
+
+/// Resolve `extends:` — merge parent job fields into child job (task 2.1)
+///
+/// Handles both `extends: .base` (single string) and `extends: [.base, .deploy]` (list).
+/// Performs shallow merge per GitLab semantics: child fields override parent fields.
+fn resolve_extends(mapping: &serde_yaml::Mapping) -> serde_yaml::Mapping {
+    let mut resolved = serde_yaml::Mapping::new();
+
+    // First pass: clone all entries
+    for (k, v) in mapping {
+        resolved.insert(k.clone(), v.clone());
+    }
+
+    // Second pass: resolve extends for each job
+    for (key, value) in mapping.clone() {
+        if let Value::Mapping(job_map) = value {
+            let mut merged = job_map.clone();
+            resolve_extends_for_job(&mut merged, mapping);
+            resolved.insert(key, Value::Mapping(merged));
+        }
+    }
+
+    resolved
+}
+
+/// Resolve extends for a single job by merging parent fields
+fn resolve_extends_for_job(job_map: &mut serde_yaml::Mapping, all_entries: &serde_yaml::Mapping) {
+    let extends_val = match job_map.get(Value::String("extends".to_string())) {
+        Some(v) => v.clone(),
+        None => return,
+    };
+
+    // Remove extends from the child
+    job_map.remove(Value::String("extends".to_string()));
+
+    // Get the list of parent names
+    let parent_names: Vec<String> = match &extends_val {
+        Value::String(s) => vec![s.clone()],
+        Value::Sequence(seq) => seq
+            .iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .collect(),
+        _ => return,
+    };
+
+    // Merge each parent (later parents override earlier ones, child overrides all)
+    for parent_name in &parent_names {
+        let parent_val = match all_entries.get(Value::String(parent_name.clone())) {
+            Some(Value::Mapping(m)) => m.clone(),
+            _ => continue,
+        };
+
+        // Insert parent fields only if child doesn't already have them
+        for (pk, pv) in parent_val {
+            if !job_map.contains_key(&pk) {
+                job_map.insert(pk, pv);
+            }
+        }
+    }
+}
+
+/// Parse top-level `workflow:rules:` block (task 2.4)
+fn parse_workflow_rules(mapping: &serde_yaml::Mapping) -> Vec<RuleCondition> {
+    let workflow_val = match mapping.get(Value::String("workflow".to_string())) {
+        Some(v) => v,
+        None => return Vec::new(),
+    };
+
+    let workflow_map = match workflow_val.as_mapping() {
+        Some(m) => m,
+        None => return Vec::new(),
+    };
+
+    let rules_val = match workflow_map.get(Value::String("rules".to_string())) {
+        Some(Value::Sequence(seq)) => seq,
+        _ => return Vec::new(),
+    };
+
+    rules_val.iter().filter_map(parse_rule_condition).collect()
+}
+
+/// Parse a `rules:` block for a job (task 2.3)
+fn parse_rules(mapping: &serde_yaml::Mapping) -> Vec<RuleCondition> {
+    let rules_val = match mapping.get(Value::String("rules".to_string())) {
+        Some(Value::Sequence(seq)) => seq,
+        _ => return Vec::new(),
+    };
+
+    rules_val.iter().filter_map(parse_rule_condition).collect()
+}
+
+/// Parse a single rule condition from a YAML mapping
+fn parse_rule_condition(rule_val: &Value) -> Option<RuleCondition> {
+    let rule_map = rule_val.as_mapping()?;
+
+    let when = rule_map
+        .get(Value::String("when".to_string()))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let if_condition = rule_map
+        .get(Value::String("if".to_string()))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let exists = rule_map
+        .get(Value::String("exists".to_string()))
+        .and_then(|v| {
+            if let Value::Sequence(seq) = v {
+                let paths: Vec<String> = seq
+                    .iter()
+                    .filter_map(|p| p.as_str().map(String::from))
+                    .collect();
+                if paths.is_empty() {
+                    None
+                } else {
+                    Some(paths)
+                }
+            } else {
+                None
+            }
+        });
+
+    let allow_failure = rule_map
+        .get(Value::String("allow_failure".to_string()))
+        .and_then(|v| v.as_bool());
+
+    if when.is_some() || if_condition.is_some() || exists.is_some() || allow_failure.is_some() {
+        Some(RuleCondition {
+            when,
+            if_condition,
+            exists,
+            allow_failure,
+        })
+    } else {
+        None
+    }
 }
 
 /// Parse GitLab CI configuration YAML content
@@ -70,7 +212,13 @@ pub fn parse(content: &str) -> Result<Pipeline> {
         }
     });
 
-    // Parse jobs (everything under top-level keys that aren't reserved keywords)
+    // Parse top-level workflow:rules (task 2.4)
+    let workflow_rules = parse_workflow_rules(mapping);
+
+    // Resolve extends: merge parent fields into child jobs (task 2.1)
+    let resolved = resolve_extends(mapping);
+
+    // Filter out hidden jobs (task 2.2) — keys starting with '.'
     let reserved = vec![
         "stages",
         "variables",
@@ -85,19 +233,19 @@ pub fn parse(content: &str) -> Result<Pipeline> {
 
     let mut jobs = Vec::new();
 
-    for (key, value) in mapping {
+    for (key, value) in &resolved {
         let key_str = match key.as_str() {
             Some(s) => s,
             None => continue,
         };
 
-        // Skip reserved top-level keys and stage names
+        // Skip reserved top-level keys
         if reserved.contains(&key_str) || key_str == "workflow" {
             continue;
         }
 
-        // Skip stage names (they're just strings)
-        if key_str == "stages" {
+        // Skip hidden jobs (task 2.2) — keys starting with '.'
+        if key_str.starts_with('.') {
             continue;
         }
 
@@ -117,6 +265,10 @@ pub fn parse(content: &str) -> Result<Pipeline> {
         jobs,
         env,
         source: content.to_string(),
+        is_reusable: false,
+        workflow_call_inputs: Vec::new(),
+        workflow_call_secrets: Vec::new(),
+        workflow_rules,
     })
 }
 
@@ -132,7 +284,6 @@ pub fn parse_includes(content: &str) -> Result<IncludeInfo> {
 
     let mut info = IncludeInfo::default();
 
-    // Get the include block
     let include_val = match mapping {
         Ok(m) => m.get("include"),
         Err(e) => return Err(e),
@@ -143,21 +294,18 @@ pub fn parse_includes(content: &str) -> Result<IncludeInfo> {
     };
 
     let Value::Sequence(includes) = include_block else {
-        // Single include as string
         if let Value::String(s) = include_block {
             classify_include(s, &mut info);
         }
         return Ok(info);
     };
 
-    // Each item in the include array
     for item in includes {
         match item {
             Value::String(s) => {
                 classify_include(s, &mut info);
             }
             Value::Mapping(m) => {
-                // Could be { local: "path" }, { remote: "url" }, { project: "path" }
                 if let Some(Value::String(s)) = m.get("local") {
                     info.local.push(s.clone());
                 }
@@ -165,7 +313,6 @@ pub fn parse_includes(content: &str) -> Result<IncludeInfo> {
                     info.remote.push(s.clone());
                 }
                 if let Some(Value::String(s)) = m.get("project") {
-                    // project::path format
                     if let Some(Value::String(path)) = m.get("file") {
                         info.project.push(format!("{}:{}", s, path));
                     } else {
@@ -180,14 +327,12 @@ pub fn parse_includes(content: &str) -> Result<IncludeInfo> {
     Ok(info)
 }
 
-/// Classify a single include string into the appropriate category
 fn classify_include(s: &str, info: &mut IncludeInfo) {
     if s.starts_with("https://") || s.starts_with("http://") {
         info.remote.push(s.to_string());
     } else if s.contains("::") {
         info.project.push(s.to_string());
     } else {
-        // Local file
         info.local.push(s.to_string());
     }
 }
@@ -274,7 +419,6 @@ fn parse_job(id: &str, map: &serde_yaml::Mapping) -> Result<Job> {
     }
 
     // Parse script steps
-    // GitLab CI can have script, before_script, after_script
     for script_key in &["before_script", "script", "after_script"] {
         if let Some(script_val) = map.get(*script_key) {
             let run = match script_val {
@@ -300,7 +444,7 @@ fn parse_job(id: &str, map: &serde_yaml::Mapping) -> Result<Job> {
         }
     }
 
-    // Parse trigger (for multi-project pipelines)
+    // Parse trigger
     if let Some(trigger_val) = map.get("trigger") {
         let trigger_str = match trigger_val {
             Value::String(s) => s.clone(),
@@ -322,6 +466,9 @@ fn parse_job(id: &str, map: &serde_yaml::Mapping) -> Result<Job> {
         });
     }
 
+    // Parse rules (task 2.3)
+    let rules = parse_rules(map);
+
     Ok(Job {
         id: id.to_string(),
         name: None,
@@ -331,5 +478,6 @@ fn parse_job(id: &str, map: &serde_yaml::Mapping) -> Result<Job> {
         container_image,
         service_images,
         timeout_minutes,
+        rules,
     })
 }

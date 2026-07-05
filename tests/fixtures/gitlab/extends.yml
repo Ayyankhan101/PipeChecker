@@ -1,0 +1,26 @@
+stages:
+  - build
+  - test
+  - deploy
+
+.base_template:
+  image: node:18
+  before_script:
+    - npm ci
+
+.build_job:
+  extends: .base_template
+  script:
+    - npm run build
+
+test_job:
+  extends: .build_job
+  stage: test
+  script:
+    - npm test
+
+deploy_job:
+  extends: [.build_job, .base_template]
+  stage: deploy
+  script:
+    - npm run deploy

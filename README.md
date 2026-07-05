@@ -5,7 +5,7 @@
 [![CI](https://github.com/Ayyankhan101/PipeChecker/actions/workflows/ci.yml/badge.svg)](https://github.com/Ayyankhan101/PipeChecker/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/pipechecker.svg)](https://crates.io/crates/pipechecker)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue)](LICENSE-MIT)
-[![Test Coverage](https://img.shields.io/badge/tests-134%20passing-brightgreen)]()
+[![Test Coverage](https://img.shields.io/badge/tests-257%20passing-brightgreen)]()
 [![Rust](https://img.shields.io/badge/rust-2021-orange)](Cargo.toml)
 
 ---
@@ -35,6 +35,11 @@ Every developer has been here:
 | ⚠️ **Missing concurrency cancel** | Concurrency group without `cancel-in-progress` |
 | ⚠️ **Static cache keys** | `actions/cache` without `hashFiles(...)` |
 | ℹ️ **Missing retention-days** | `actions/upload-artifact` with default 90-day retention |
+| ⚠️ **Deprecated actions** | `set-output`, `save-state`, `node:12/16`, old action versions |
+| ⚠️ **Excessive timeout** | Job `timeout-minutes` > 60 minutes |
+| ⚠️ **Missing concurrency** | No concurrency group on workflow |
+| ⚠️ **Large matrix** | Matrix >9 jobs without `fail-fast: false` |
+| ⚠️ **PR target insecure** | `pull_request_target` with `actions/checkout` |
 
 ---
 
@@ -244,16 +249,19 @@ pipechecker --tui
 | `--tui` | Launch the interactive terminal UI |
 | `--watch`, `-w` | Watch for file changes and re-run audits |
 | `--fix` | Auto-fix issues (pin unpinned actions + Docker `:latest` tags) |
+| `--fix-dry-run` | Preview fixes without modifying files (requires `--fix`) |
 | `--init` | Initialize a new workflow from a template |
-| `--template` <name> | Template name: `node`, `rust`, `docker`, `gitlab-node` |
+| `--template` <name> | Template name: `node`, `rust`, `docker`, `gitlab-node`, `python`, `go`, `java`, `circleci` |
 | `--force` | Force overwrite existing files (with `--init`) |
 | `--install-hook` | Install a git pre-commit hook |
 | `--diff`, `-d` | Check only files changed since base branch |
 | `--diff-branch` <branch> | Base branch for diff mode (default: `main`) |
-| `--format`, `-f` `<text\|json>` | Output format (default: `text`) |
+| `--format`, `-f` `<text\|json\|sarif>` | Output format (default: `text`) |
 | `--strict`, `-s` | Treat warnings as errors (exit code 1) |
 | `--quiet`, `-q` | Only output errors — suppress warnings and info |
 | `--ci` | CI mode — implies `--quiet --strict --format json` |
+| `--config` <path> | Load custom config file (overrides auto-discovery) |
+| `completions` | Generate shell completions (`--shell bash\|zsh\|fish`) |
 | `--verbose` | Show diagnostic info (auditors ran, per-severity counts) |
 | `--explain` <CODE> | Print detailed explanation for a rule code (e.g. `PC005`) |
 | `--no-pinning` | Skip Docker image and action-pinning checks |
@@ -419,6 +427,12 @@ Remove one of the edges in the cycle to break it.
 | `PC016` | Missing concurrency cancel |
 | `PC017` | Static cache key |
 | `PC018` | Missing artifact retention |
+| `PC019` | Deprecated action/feature |
+| `PC020` | Excessive timeout (>60 min) |
+| `PC021` | Missing concurrency group |
+| `PC022` | Large matrix without fail-fast |
+| `PC023` | Insecure pull_request_target |
+| `PC024` | Reusable workflow missing inputs |
 
 ### 📢 Verbose Mode
 See exactly what PipeChecker is doing — which files it found, which auditors ran, and per-severity breakdowns:
@@ -542,6 +556,24 @@ Detects:
 - Secret references in `with:` blocks
 - Undeclared `${{ env.X }}` references
 - Suspicious values (long alphanumeric strings, base64)
+
+### 🔧 Deprecated Features Auditor
+Warns about deprecated GitHub Actions features:
+
+- `set-output` and `save-state` commands (use `$GITHUB_OUTPUT` / `$GITHUB_STATE`)
+- End-of-life Node.js versions (`node:12`, `node:16`)
+- Very old action versions (`@v1`, `@v2`)
+
+### 💰 Cost/Efficiency Auditor
+Warns about CI cost concerns:
+
+- Job `timeout-minutes` exceeding 60 minutes
+- Missing `concurrency:` groups (wasted CI minutes)
+
+### 🔒 Security Auditor
+Detects insecure patterns:
+
+- `pull_request_target` combined with unrestricted `actions/checkout` (secret leak risk)
 
 ### 🐳 Docker & 📌 Pinning Auditor
 Ensures reproducible builds:

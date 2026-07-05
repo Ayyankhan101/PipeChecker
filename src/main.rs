@@ -1,12 +1,14 @@
 use clap::Parser;
+use clap_complete::{generate, Shell};
 use pipechecker::{
-    audit_file, discover_workflows, load_config, rule_codes, AuditOptions, DiscoveryOptions,
+    audit_file, discover_workflows, load_config, load_from, rule_codes, AuditOptions,
+    DiscoveryOptions,
 };
-use std::{fs, path::Path, process, time::Instant};
+use std::{fs, io, path::Path, process, time::Instant};
 
 fn init_from_template(template: Option<String>, force: bool) {
     let tmpl = template.unwrap_or_else(|| {
-        eprintln!("Please specify a template: --init --template <node|rust|docker|gitlab-node>");
+        eprintln!("Please specify a template: --init --template <node|rust|docker|gitlab-node|python|go|java|circleci>");
         process::exit(1);
     });
 
@@ -16,6 +18,10 @@ fn init_from_template(template: Option<String>, force: bool) {
         ("rust", include_str!("../templates/rust.yml")),
         ("docker", include_str!("../templates/docker.yml")),
         ("gitlab-node", include_str!("../templates/gitlab-node.yml")),
+        ("python", include_str!("../templates/python.yml")),
+        ("go", include_str!("../templates/go.yml")),
+        ("java", include_str!("../templates/java.yml")),
+        ("circleci", include_str!("../templates/circleci.yml")),
     ];
 
     let (name, content) = templates
@@ -24,12 +30,14 @@ fn init_from_template(template: Option<String>, force: bool) {
         .map(|(n, c)| (*n, *c))
         .unwrap_or_else(|| {
             eprintln!("Unknown template: {}", tmpl);
-            eprintln!("Available: node, rust, docker, gitlab-node");
+            eprintln!("Available: node, rust, docker, gitlab-node, python, go, java, circleci");
             process::exit(1);
         });
 
     let dest = if name == "gitlab-node" {
         Path::new(".gitlab-ci.yml").to_path_buf()
+    } else if name == "circleci" {
+        Path::new(".circleci/config.yml").to_path_buf()
     } else {
         Path::new(".github/workflows").join(format!("{}.yml", name))
     };
@@ -111,6 +119,90 @@ fn get_changed_workflows(base_branch: &str) -> Vec<String> {
 // ---------------------------------------------------------------------------
 // Shared output helpers
 // ---------------------------------------------------------------------------
+
+/// Load config from --config path or default, then apply CLI overrides
+fn load_config_rules(cli: &Cli) -> pipechecker::Rules {
+    let mut rules = if let Some(ref config_path) = cli.config {
+        load_from(config_path).rules
+    } else {
+        load_config().rules
+    };
+    if cli.no_permissions {
+        rules.permissions_check = false;
+    }
+    if cli.no_schema {
+        rules.schema_validation = false;
+    }
+    rules
+}
+
+/// Format an AuditResult as SARIF 2.1.0 JSON
+fn format_sarif(result: &pipechecker::AuditResult, file_path: &str) -> String {
+    let sarif_results: Vec<serde_json::Value> = result
+        .issues
+        .iter()
+        .map(|issue| {
+            let rule_id = issue.rule_code.unwrap_or("PC000");
+            let level = match issue.severity {
+                pipechecker::Severity::Error => "error",
+                pipechecker::Severity::Warning => "warning",
+                pipechecker::Severity::Info => "note",
+            };
+
+            let mut location_obj = serde_json::json!({
+                "physicalLocation": {
+                    "artifactLocation": {
+                        "uri": file_path,
+                        "uriBaseId": "%SRCROOT%"
+                    }
+                }
+            });
+
+            if let Some(loc) = &issue.location {
+                if loc.line > 0 {
+                    location_obj["physicalLocation"]["region"] = serde_json::json!({
+                        "startLine": loc.line,
+                        "startColumn": loc.column,
+                    });
+                }
+            }
+
+            let mut result_obj = serde_json::json!({
+                "ruleId": rule_id,
+                "level": level,
+                "message": {
+                    "text": issue.message
+                },
+                "locations": [location_obj],
+            });
+
+            if let Some(suggestion) = &issue.suggestion {
+                result_obj["fixes"] = serde_json::json!([{
+                    "description": { "text": suggestion },
+                }]);
+            }
+
+            result_obj
+        })
+        .collect();
+
+    let sarif = serde_json::json!({
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "pipechecker",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "rules": []
+                }
+            },
+            "results": sarif_results
+        }]
+    });
+
+    serde_json::to_string_pretty(&sarif).unwrap()
+}
 
 /// Print a single issue in text format.
 fn print_issue(issue: &pipechecker::Issue, quiet: bool) {
@@ -273,6 +365,52 @@ fn explain_rule(code: &str) {
              This quickly consumes repository storage quotas. Add 'retention-days: 7' \
              (or another low number) to save space.",
         ),
+        (
+            rule_codes::DEPRECATED_ACTION,
+            "Deprecated GitHub Actions feature",
+            "This workflow uses a deprecated GitHub Actions feature. 'set-output' and \
+             'save-state' commands are deprecated — use '$GITHUB_OUTPUT' and \
+             '$GITHUB_STATE' environment files instead. Node.js 12 and 16 are \
+             end-of-life — upgrade to node:20 or later. Old action versions (@v1, @v2) \
+             may have security vulnerabilities.",
+        ),
+        (
+            rule_codes::EXCESSIVE_TIMEOUT,
+            "Excessive job timeout",
+            "This job has a timeout exceeding 60 minutes. Excessive timeouts waste CI \
+             minutes and may indicate a configuration problem. Consider reducing the \
+             timeout or splitting the job into smaller units.",
+        ),
+        (
+            rule_codes::MISSING_CONCURRENCY,
+            "Missing concurrency group",
+            "This workflow has no 'concurrency:' group. Without concurrency control, \
+             multiple runs of the same workflow can execute simultaneously, wasting CI \
+             minutes. Add a concurrency group with 'cancel-in-progress: true' to \
+             automatically cancel outdated runs.",
+        ),
+        (
+            rule_codes::LARGE_MATRIX_NO_FAILFAST,
+            "Large matrix without fail-fast",
+            "This matrix strategy has more than 9 combinations without 'fail-fast: false'. \
+             A failing job in a large matrix will cancel all other jobs, potentially hiding \
+             useful test results. Consider adding 'fail-fast: false' for large matrices.",
+        ),
+        (
+            rule_codes::PR_TARGET_INSECURE,
+            "Insecure pull_request_target usage",
+            "This workflow uses 'pull_request_target' with 'actions/checkout'. This is a \
+             known security vulnerability pattern — pull_request_target runs with write \
+             permissions and can leak secrets to attacker-controlled PRs. If you need to \
+             check out PR code, use 'pull_request' instead, or carefully restrict the \
+             ref: to a fixed branch.",
+        ),
+        (
+            rule_codes::REUSABLE_WORKFLOW_MISSING_INPUTS,
+            "Reusable workflow missing inputs",
+            "A reusable workflow call is missing required inputs. Ensure all required \
+             inputs are passed when calling a reusable workflow via 'uses:'.",
+        ),
     ];
 
     let upper = code.to_uppercase();
@@ -284,7 +422,7 @@ fn explain_rule(code: &str) {
         }
         None => {
             eprintln!("Unknown rule code: '{}'", code);
-            eprintln!("Known codes: PC001-PC018");
+            eprintln!("Known codes: PC001-PC024");
             process::exit(1);
         }
     }
@@ -342,11 +480,15 @@ struct Cli {
     #[arg(long)]
     fix: bool,
 
+    /// Preview fixes without writing changes (requires --fix)
+    #[arg(long, requires = "fix")]
+    fix_dry_run: bool,
+
     /// Interactive terminal UI mode
     #[arg(long)]
     tui: bool,
 
-    /// Output format (text, json)
+    /// Output format (text, json, sarif)
     #[arg(short, long, default_value = "text")]
     format: String,
 
@@ -401,6 +543,24 @@ struct Cli {
     /// Show detailed explanation for a rule code (e.g. --explain PC005)
     #[arg(long, value_name = "CODE")]
     explain: Option<String>,
+
+    /// Path to a custom config file (overrides auto-detection)
+    #[arg(long, value_name = "PATH")]
+    config: Option<String>,
+
+    /// Subcommand
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(clap::Subcommand)]
+enum Commands {
+    /// Generate shell completions for the specified shell
+    Completions {
+        /// Shell to generate completions for
+        #[arg(short, long)]
+        shell: Shell,
+    },
 }
 
 impl Cli {
@@ -427,6 +587,13 @@ impl Cli {
 fn main() {
     let cli = Cli::parse();
 
+    // Handle subcommands first
+    if let Some(Commands::Completions { shell }) = cli.command {
+        let mut cmd = <Cli as clap::CommandFactory>::command();
+        generate(shell, &mut cmd, "pipechecker", &mut io::stdout());
+        return;
+    }
+
     // Handle --explain before anything else — no file needed
     if let Some(ref code) = cli.explain {
         explain_rule(code);
@@ -449,10 +616,11 @@ fn main() {
     }
 
     if cli.tui {
+        let rules = load_config_rules(&cli);
         let options = AuditOptions {
             check_docker_images: !cli.no_pinning,
             strict_mode: cli.effective_strict(),
-            rules: Some(load_config().rules),
+            rules: Some(rules),
         };
         if let Err(e) = pipechecker::tui::run_tui(options) {
             eprintln!("TUI error: {}", e);
@@ -466,19 +634,30 @@ fn main() {
 
         let file = cli.file.clone().unwrap_or_else(auto_detect_workflow);
 
-        match pipechecker::fix::fix_file(&file) {
+        match pipechecker::fix::fix_file(&file, cli.fix_dry_run) {
             Ok(result) => {
                 if result.fixed == 0 {
                     println!("✅ No fixable issues found in {}", file);
                     println!("   All actions are already pinned or use local references");
                 } else {
-                    println!("✨ Fixed {} issue(s) in {}:\n", result.fixed, file);
+                    if cli.fix_dry_run {
+                        println!(
+                            "📋 Dry run — {} issue(s) would be fixed in {}:\n",
+                            result.fixed, file
+                        );
+                    } else {
+                        println!("✨ Fixed {} issue(s) in {}:\n", result.fixed, file);
+                    }
                     for change in &result.changes {
                         if change.starts_with("  ") {
                             println!("{}", change);
                         }
                     }
-                    println!("\n💡 Review the changes and commit them!");
+                    if cli.fix_dry_run {
+                        println!("\n💡 Run without --fix-dry-run to apply these changes.");
+                    } else {
+                        println!("\n💡 Review the changes and commit them!");
+                    }
                 }
             }
             Err(e) => {
@@ -489,14 +668,7 @@ fn main() {
         process::exit(0);
     }
 
-    let mut rules = load_config().rules;
-    // CLI flags can override individual config-file rules
-    if cli.no_permissions {
-        rules.permissions_check = false;
-    }
-    if cli.no_schema {
-        rules.schema_validation = false;
-    }
+    let rules = load_config_rules(&cli);
 
     let options = AuditOptions {
         check_docker_images: !cli.no_pinning,
@@ -571,6 +743,8 @@ fn main() {
 
             if cli.effective_format() == "json" {
                 println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            } else if cli.effective_format() == "sarif" {
+                println!("{}", format_sarif(&result, &file));
             } else {
                 println!("Provider: {:?}", result.provider);
                 println!("\n{}", result.summary);
@@ -664,10 +838,11 @@ fn watch_mode(cli: &Cli) {
     eprintln!("👀 Watching for workflow changes...");
     eprintln!("   Press Ctrl+C to stop\n");
 
+    let rules = load_config_rules(cli);
     let options = AuditOptions {
         check_docker_images: !cli.no_pinning,
         strict_mode: cli.effective_strict(),
-        rules: Some(load_config().rules),
+        rules: Some(rules),
     };
 
     // Initial audit pass
@@ -746,7 +921,7 @@ fn watch_mode(cli: &Cli) {
                             let opts = AuditOptions {
                                 check_docker_images: !cli.no_pinning,
                                 strict_mode: cli.effective_strict(),
-                                rules: Some(load_config().rules),
+                                rules: Some(load_config_rules(cli)),
                             };
                             let _ = audit_file(&path_str, opts);
                         }
@@ -769,7 +944,6 @@ fn audit_all_workflows(
     quiet: bool,
     verbose: bool,
 ) {
-    let config = load_config();
     let all_files = discover_workflows(Path::new("."), &DiscoveryOptions::default());
 
     if all_files.is_empty() {
@@ -790,6 +964,8 @@ fn audit_all_workflows(
     let total_start = Instant::now();
     let mut total_errors = 0;
     let mut total_warnings = 0;
+
+    let config = load_config();
 
     for file in &all_files {
         if config.should_ignore(file) {

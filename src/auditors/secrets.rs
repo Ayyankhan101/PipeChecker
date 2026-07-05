@@ -48,6 +48,11 @@ pub fn audit(pipeline: &Pipeline) -> Result<Vec<Issue>> {
         SECRET_REGEX.get_or_init(|| Regex::new(r"\$\{\{\s*secrets\.(\w+)\s*\}\}").unwrap());
     let env_pattern = ENV_REGEX.get_or_init(|| Regex::new(r"\$\{\{\s*env\.(\w+)\s*\}\}").unwrap());
 
+    // Check for pull_request_target security risk (GitHub Actions only)
+    if pipeline.provider == crate::models::Provider::GitHubActions {
+        check_pull_request_target(pipeline, &mut issues);
+    }
+
     let mut declared_env: HashSet<String> = pipeline.env.iter().map(|e| e.key.clone()).collect();
 
     // Check pipeline-level env vars for hardcoded secrets
@@ -292,9 +297,90 @@ fn is_potential_secret(key: &str, value: &str) -> bool {
     false
 }
 
+/// Check for `on: pull_request_target` combined with `actions/checkout` (security risk)
+fn check_pull_request_target(pipeline: &Pipeline, issues: &mut Vec<Issue>) {
+    let source = &pipeline.source;
+
+    // Detect pull_request_target trigger
+    let has_pr_target = source.contains("pull_request_target");
+    if !has_pr_target {
+        return;
+    }
+
+    // Check if any job uses actions/checkout without ref: restriction
+    let mut has_unrestricted_checkout = false;
+    for job in &pipeline.jobs {
+        for step in &job.steps {
+            if let Some(uses) = &step.uses {
+                if uses.starts_with("actions/checkout") {
+                    // Check if there's a 'ref:' restriction in with_inputs
+                    let has_ref = step
+                        .with_inputs
+                        .as_ref()
+                        .and_then(|v| v.get("ref"))
+                        .is_some();
+                    if !has_ref {
+                        has_unrestricted_checkout = true;
+                        let (line, col) = pipeline.find_job_line(&job.id, "uses");
+                        issues.push(Issue::for_job_with_code(
+                            Severity::Warning,
+                            &format!(
+                                "Job '{}' uses actions/checkout in a pull_request_target workflow without ref: restriction",
+                                job.id
+                            ),
+                            &job.id,
+                            line,
+                            col,
+                            Some(
+                                "pull_request_target runs in the context of the base branch. \
+                                 Using actions/checkout without ref: may expose secrets to untrusted code. \
+                                 Add 'ref: ${{ github.event.pull_request.head.sha }}' or restrict the checkout."
+                                    .to_string(),
+                            ),
+                            rule_codes::PR_TARGET_INSECURE,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    // If no checkout found at all but pull_request_target is used, still warn
+    if !has_unrestricted_checkout && !has_pr_target {
+        return;
+    }
+
+    // General warning about pull_request_target if no specific checkout issue was flagged
+    if has_pr_target && !has_unrestricted_checkout {
+        // Check if there's any checkout at all
+        let has_any_checkout = pipeline.jobs.iter().any(|job| {
+            job.steps.iter().any(|s| {
+                s.uses
+                    .as_deref()
+                    .is_some_and(|u| u.starts_with("actions/checkout"))
+            })
+        });
+        if !has_any_checkout {
+            let (line, col) = pipeline.find_line("pull_request_target");
+            issues.push(Issue::with_code(
+                Severity::Warning,
+                "Workflow uses 'pull_request_target' trigger — ensure secrets are not exposed to untrusted code",
+                Some(
+                    "pull_request_target runs with the base branch's secrets. \
+                     Review all steps to ensure they cannot be manipulated by the PR author."
+                        .to_string(),
+                ),
+                rule_codes::PR_TARGET_INSECURE,
+            ));
+            let _ = (line, col);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::Provider;
 
     #[test]
     fn test_secret_reference_is_not_secret() {
@@ -351,5 +437,150 @@ mod tests {
     #[test]
     fn test_empty_string_not_secret() {
         assert!(!is_potential_secret("var", ""));
+    }
+
+    // --- pull_request_target tests ---
+
+    #[test]
+    fn test_pr_target_with_unrestricted_checkout_warns() {
+        let source = "name: CI\non:\n  pull_request_target:\njobs:\n  build:\n    runs-on: ubuntu\n    steps:\n      - uses: actions/checkout@v4\n";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![crate::models::Job {
+                id: "build".to_string(),
+                name: None,
+                depends_on: vec![],
+                steps: vec![crate::models::Step {
+                    name: None,
+                    uses: Some("actions/checkout@v4".to_string()),
+                    run: None,
+                    env: vec![],
+                    with_inputs: None,
+                }],
+                env: vec![],
+                container_image: None,
+                service_images: vec![],
+                timeout_minutes: None,
+                rules: vec![],
+            }],
+            env: vec![],
+            source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
+        };
+        let issues = audit(&pipeline).unwrap();
+        assert!(issues
+            .iter()
+            .any(|i| i.rule_code == Some(rule_codes::PR_TARGET_INSECURE)));
+    }
+
+    #[test]
+    fn test_pr_target_with_ref_checkout_ok() {
+        let source = "name: CI\non:\n  pull_request_target:\njobs:\n  build:\n    runs-on: ubuntu\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.event.pull_request.head.sha }}\n";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![crate::models::Job {
+                id: "build".to_string(),
+                name: None,
+                depends_on: vec![],
+                steps: vec![crate::models::Step {
+                    name: None,
+                    uses: Some("actions/checkout@v4".to_string()),
+                    run: None,
+                    env: vec![],
+                    with_inputs: Some(
+                        serde_yaml::from_str("ref: ${{ github.event.pull_request.head.sha }}")
+                            .unwrap(),
+                    ),
+                }],
+                env: vec![],
+                container_image: None,
+                service_images: vec![],
+                timeout_minutes: None,
+                rules: vec![],
+            }],
+            env: vec![],
+            source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
+        };
+        let issues = audit(&pipeline).unwrap();
+        assert!(!issues
+            .iter()
+            .any(|i| i.rule_code == Some(rule_codes::PR_TARGET_INSECURE)));
+    }
+
+    #[test]
+    fn test_pr_target_without_checkout_warns() {
+        let source = "name: CI\non:\n  pull_request_target:\njobs:\n  build:\n    runs-on: ubuntu\n    steps:\n      - run: echo hi\n";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![crate::models::Job {
+                id: "build".to_string(),
+                name: None,
+                depends_on: vec![],
+                steps: vec![crate::models::Step {
+                    name: None,
+                    uses: None,
+                    run: Some("echo hi".to_string()),
+                    env: vec![],
+                    with_inputs: None,
+                }],
+                env: vec![],
+                container_image: None,
+                service_images: vec![],
+                timeout_minutes: None,
+                rules: vec![],
+            }],
+            env: vec![],
+            source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
+        };
+        let issues = audit(&pipeline).unwrap();
+        assert!(issues
+            .iter()
+            .any(|i| i.rule_code == Some(rule_codes::PR_TARGET_INSECURE)));
+    }
+
+    #[test]
+    fn test_no_pr_target_no_issue() {
+        let source = "name: CI\non: push:\njobs:\n  build:\n    runs-on: ubuntu\n    steps:\n      - uses: actions/checkout@v4\n";
+        let pipeline = Pipeline {
+            provider: Provider::GitHubActions,
+            jobs: vec![crate::models::Job {
+                id: "build".to_string(),
+                name: None,
+                depends_on: vec![],
+                steps: vec![crate::models::Step {
+                    name: None,
+                    uses: Some("actions/checkout@v4".to_string()),
+                    run: None,
+                    env: vec![],
+                    with_inputs: None,
+                }],
+                env: vec![],
+                container_image: None,
+                service_images: vec![],
+                timeout_minutes: None,
+                rules: vec![],
+            }],
+            env: vec![],
+            source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
+        };
+        let issues = audit(&pipeline).unwrap();
+        assert!(!issues
+            .iter()
+            .any(|i| i.rule_code == Some(rule_codes::PR_TARGET_INSECURE)));
     }
 }

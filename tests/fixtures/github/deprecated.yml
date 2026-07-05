@@ -1,0 +1,26 @@
+name: Deprecated Features Example
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: node:12
+    steps:
+      - uses: actions/checkout@v1
+      - name: Set output (deprecated)
+        run: echo "::set-output name=result::done"
+      - name: Save state (deprecated)
+        run: echo "::save-state name=status::ok"
+      - name: Build
+        run: npm run build
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    container: node:16-alpine
+    steps:
+      - uses: actions/setup-node@v2
+      - run: npm test

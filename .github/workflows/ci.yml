@@ -146,7 +146,7 @@ jobs:
           cargo tarpaulin \
             --out Json \
             --output-dir ./coverage \
-            --fail-under 54
+            --fail-under 65
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4

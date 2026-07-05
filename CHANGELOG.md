@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-07-05
+
+### Added
+- **GitLab CI `extends:` support** — Parser now resolves `extends:` chains (single string or list) before processing jobs, enabling most real-world GitLab configs
+- **GitLab CI hidden jobs filtering** — Jobs prefixed with `.` (e.g., `.base_template`) are now excluded from validation
+- **GitLab CI `rules:` parsing** — Modern `rules:` keyword is now parsed into `RuleCondition` structs on each job
+- **GitLab CI `workflow:rules`** — Top-level `workflow:rules:` block is now parsed
+- **GitHub Actions reusable workflows** — `on: workflow_call` trigger is detected and `inputs:`/`secrets:` definitions are parsed
+- **Matrix strategy auditor** (PC022) — Warns when matrix has >9 combinations without `fail-fast: false`
+- **Deprecated features auditor** (PC019) — Detects `set-output`, `save-state`, EOL Node.js versions, and old action versions
+- **Cost/efficiency auditor** (PC020-PC021) — Warns on excessive timeouts (>60 min) and missing concurrency groups
+- **`pull_request_target` security check** (PC023) — Warns about insecure `pull_request_target` + `actions/checkout` pattern
+- **`--fix-dry-run` flag** — Preview auto-fixes without modifying files
+- **Shell completions** — `pipechecker completions --shell bash|zsh|fish` for tab completion
+- **SARIF output format** — `--format sarif` for GitHub Code Scanning integration
+- **`--config` flag** — Specify custom config file path instead of auto-discovery
+- **4 new templates** — `python`, `go`, `java`, `circleci` added to `--init`
+- **Expanded auto-fix mappings** — KNOWN_ACTIONS expanded from 16 to 42 entries
+
+### Changed
+- Version bumped to 0.3.2
+- Coverage threshold increased from 54% to 65%
+- 6 new rule codes: PC019-PC024
+- 2 new config toggles: `deprecated_feature_check`, `cost_efficiency_check`
+- Test count increased from 134 to 257
+
+[0.3.2]: https://github.com/Ayyankhan101/PipeCheck/compare/v0.3.1...v0.3.2
+
 ## [0.3.1] - 2026-07-02
 
 ### Changed

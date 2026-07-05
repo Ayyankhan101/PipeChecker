@@ -1,0 +1,33 @@
+stages:
+  - build
+  - test
+
+.base_config:
+  image: node:18
+  variables:
+    NODE_ENV: test
+
+.deploy_template:
+  stage: deploy
+  script:
+    - echo "deploying"
+
+build_job:
+  extends: .base_config
+  stage: build
+  script:
+    - npm run build
+
+test_job:
+  extends: .base_config
+  stage: test
+  script:
+    - npm test
+
+.hidden_job:
+  script:
+    - echo "this should not appear"
+
+._private_template:
+  script:
+    - echo "also hidden"
