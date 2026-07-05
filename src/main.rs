@@ -1101,10 +1101,7 @@ mod tests {
             results[0]["locations"][0]["physicalLocation"]["region"]["startColumn"],
             3
         );
-        assert_eq!(
-            results[0]["fixes"][0]["description"]["text"],
-            "fix it"
-        );
+        assert_eq!(results[0]["fixes"][0]["description"]["text"], "fix it");
     }
 
     #[test]
@@ -1137,12 +1134,7 @@ mod tests {
 
     #[test]
     fn test_format_sarif_no_location() {
-        let issue = Issue::with_code(
-            Severity::Error,
-            "no location",
-            None,
-            "PC001",
-        );
+        let issue = Issue::with_code(Severity::Error, "no location", None, "PC001");
         let result = make_test_result(vec![issue]);
         let sarif = format_sarif(&result, "test.yml");
         let parsed: serde_json::Value = serde_json::from_str(&sarif).unwrap();
@@ -1490,9 +1482,9 @@ mod tests {
     #[test]
     fn test_explain_all_rule_codes() {
         let codes = [
-            "PC001", "PC002", "PC003", "PC004", "PC005", "PC006", "PC007", "PC008",
-            "PC009", "PC010", "PC011", "PC012", "PC013", "PC014", "PC015", "PC016",
-            "PC017", "PC018", "PC019", "PC020", "PC021", "PC022", "PC023", "PC024",
+            "PC001", "PC002", "PC003", "PC004", "PC005", "PC006", "PC007", "PC008", "PC009",
+            "PC010", "PC011", "PC012", "PC013", "PC014", "PC015", "PC016", "PC017", "PC018",
+            "PC019", "PC020", "PC021", "PC022", "PC023", "PC024",
         ];
         for code in &codes {
             // Should not panic for any valid code

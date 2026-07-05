@@ -1,5 +1,5 @@
-use pipechecker::models::{EnvVar, Job, Pipeline, Provider, Step};
 use pipechecker::config::Rules;
+use pipechecker::models::{EnvVar, Job, Pipeline, Provider, Step};
 use pipechecker::{audit_content, AuditOptions};
 
 // =============================================================================
@@ -252,9 +252,7 @@ build:
         ..Default::default()
     };
     let issues = pipechecker::auditors::include::audit(&pipeline).unwrap();
-    assert!(issues
-        .iter()
-        .any(|i| i.message.contains("Remote include")));
+    assert!(issues.iter().any(|i| i.message.contains("Remote include")));
 }
 
 #[test]
@@ -272,9 +270,7 @@ build:
         ..Default::default()
     };
     let issues = pipechecker::auditors::include::audit(&pipeline).unwrap();
-    assert!(issues
-        .iter()
-        .any(|i| i.message.contains("Project include")));
+    assert!(issues.iter().any(|i| i.message.contains("Project include")));
 }
 
 // =============================================================================
@@ -321,9 +317,7 @@ jobs:
         ..Default::default()
     };
     let issues = pipechecker::auditors::artifacts::audit(&pipeline).unwrap();
-    assert!(issues
-        .iter()
-        .any(|i| i.message.contains("static key")));
+    assert!(issues.iter().any(|i| i.message.contains("static key")));
 }
 
 #[test]
@@ -355,9 +349,7 @@ jobs:
         ..Default::default()
     };
     let issues = pipechecker::auditors::artifacts::audit(&pipeline).unwrap();
-    assert!(issues
-        .iter()
-        .any(|i| i.message.contains("retention-days")));
+    assert!(issues.iter().any(|i| i.message.contains("retention-days")));
 }
 
 #[test]
@@ -512,9 +504,7 @@ fn test_secrets_with_inputs_undeclared_env() {
                 uses: Some("actions/checkout@v4".to_string()),
                 run: None,
                 env: vec![],
-                with_inputs: Some(
-                    serde_yaml::from_str("ref: ${{ env.MY_REF }}").unwrap(),
-                ),
+                with_inputs: Some(serde_yaml::from_str("ref: ${{ env.MY_REF }}").unwrap()),
             }],
             ..Default::default()
         }],
@@ -709,9 +699,7 @@ fn test_schema_gitlab_no_jobs() {
         ..Default::default()
     };
     let issues = pipechecker::auditors::schema::audit(&pipeline).unwrap();
-    assert!(issues
-        .iter()
-        .any(|i| i.message.contains("no jobs defined")));
+    assert!(issues.iter().any(|i| i.message.contains("no jobs defined")));
 }
 
 #[test]
@@ -783,11 +771,10 @@ build:
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
     assert_eq!(build_job.container_image, Some("node:18".to_string()));
     // child overrides parent's script
-    assert!(build_job.steps.iter().any(|s| {
-        s.run
-            .as_deref()
-            .is_some_and(|r| r.contains("echo build"))
-    }));
+    assert!(build_job
+        .steps
+        .iter()
+        .any(|s| { s.run.as_deref().is_some_and(|r| r.contains("echo build")) }));
 }
 
 #[test]
@@ -804,11 +791,10 @@ build:
     let pipeline = pipechecker::parsers::gitlab::parse(source).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
     assert_eq!(build_job.container_image, Some("node:18".to_string()));
-    assert!(build_job.steps.iter().any(|s| {
-        s.run
-            .as_deref()
-            .is_some_and(|r| r.contains("echo deploy"))
-    }));
+    assert!(build_job
+        .steps
+        .iter()
+        .any(|s| { s.run.as_deref().is_some_and(|r| r.contains("echo deploy")) }));
 }
 
 #[test]
@@ -820,11 +806,10 @@ fn test_gitlab_extends_not_found() {
     let pipeline = pipechecker::parsers::gitlab::parse(source).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
     // should still parse, just no parent fields merged
-    assert!(build_job.steps.iter().any(|s| {
-        s.run
-            .as_deref()
-            .is_some_and(|r| r.contains("echo build"))
-    }));
+    assert!(build_job
+        .steps
+        .iter()
+        .any(|s| { s.run.as_deref().is_some_and(|r| r.contains("echo build")) }));
 }
 
 #[test]
@@ -837,11 +822,10 @@ build:
 "#;
     let pipeline = pipechecker::parsers::gitlab::parse(source).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
-    assert!(build_job.steps.iter().any(|s| {
-        s.run
-            .as_deref()
-            .is_some_and(|r| r.contains("echo build"))
-    }));
+    assert!(build_job
+        .steps
+        .iter()
+        .any(|s| { s.run.as_deref().is_some_and(|r| r.contains("echo build")) }));
 }
 
 #[test]
@@ -897,7 +881,10 @@ build:
 "#;
     let pipeline = pipechecker::parsers::gitlab::parse(source).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
-    assert_eq!(build_job.container_image, Some("node:18-alpine".to_string()));
+    assert_eq!(
+        build_job.container_image,
+        Some("node:18-alpine".to_string())
+    );
 }
 
 #[test]
@@ -924,7 +911,9 @@ build:
     let pipeline = pipechecker::parsers::gitlab::parse(source).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
     assert_eq!(build_job.service_images.len(), 2);
-    assert!(build_job.service_images.contains(&"postgres:15".to_string()));
+    assert!(build_job
+        .service_images
+        .contains(&"postgres:15".to_string()));
     assert!(build_job.service_images.contains(&"redis:7".to_string()));
 }
 
@@ -1127,7 +1116,10 @@ build:
   script: echo hi
 "#;
     let pipeline = pipechecker::parsers::gitlab::parse(source).unwrap();
-    assert_eq!(pipeline.jobs[0].container_image, Some("node:18".to_string()));
+    assert_eq!(
+        pipeline.jobs[0].container_image,
+        Some("node:18".to_string())
+    );
 }
 
 #[test]
@@ -1141,12 +1133,14 @@ build:
     let pipeline = pipechecker::parsers::gitlab::parse(source).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
     assert_eq!(build_job.steps.len(), 3);
-    assert!(build_job.steps.iter().any(|s| {
-        s.name.as_deref() == Some("before_script")
-    }));
-    assert!(build_job.steps.iter().any(|s| {
-        s.name.as_deref() == Some("after_script")
-    }));
+    assert!(build_job
+        .steps
+        .iter()
+        .any(|s| { s.name.as_deref() == Some("before_script") }));
+    assert!(build_job
+        .steps
+        .iter()
+        .any(|s| { s.name.as_deref() == Some("after_script") }));
 }
 
 #[test]
@@ -1173,7 +1167,10 @@ build:
     let pipeline = pipechecker::parsers::gitlab::parse(source).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
     assert_eq!(build_job.env.len(), 2);
-    assert!(build_job.env.iter().any(|e| e.key == "FOO" && e.value == "bar"));
+    assert!(build_job
+        .env
+        .iter()
+        .any(|e| e.key == "FOO" && e.value == "bar"));
 }
 
 #[test]
@@ -1369,9 +1366,10 @@ jobs:
 "#;
     let pipeline = pipechecker::parsers::circleci::parse(source).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
-    assert!(build_job.steps.iter().any(|s| {
-        s.uses.as_deref() == Some("circleci/checkout")
-    }));
+    assert!(build_job
+        .steps
+        .iter()
+        .any(|s| { s.uses.as_deref() == Some("circleci/checkout") }));
 }
 
 #[test]
@@ -1389,9 +1387,10 @@ jobs:
 "#;
     let pipeline = pipechecker::parsers::circleci::parse(source).unwrap();
     let build_job = pipeline.jobs.iter().find(|j| j.id == "build").unwrap();
-    assert!(build_job.steps.iter().any(|s| {
-        s.uses.as_deref() == Some("circleci/save_cache")
-    }));
+    assert!(build_job
+        .steps
+        .iter()
+        .any(|s| { s.uses.as_deref() == Some("circleci/save_cache") }));
 }
 
 #[test]
@@ -1708,10 +1707,7 @@ fn test_fix_unknown_action() {
     let input = "      - uses: unknown-org/unknown-action\n";
     let result = pipechecker::fix::fix_content(input);
     assert_eq!(result.fixed, 0);
-    assert!(result
-        .changes
-        .iter()
-        .any(|c| c.contains("Unknown action")));
+    assert!(result.changes.iter().any(|c| c.contains("Unknown action")));
 }
 
 #[test]
