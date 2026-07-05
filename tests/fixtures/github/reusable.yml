@@ -1,0 +1,35 @@
+name: Reusable CI Workflow
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        required: true
+        type: string
+      run-tests:
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      npm-token:
+        required: true
+      registry-url:
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+      - run: npm ci
+      - run: npm run build
+
+  test:
+    if: ${{ inputs.run-tests }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm test

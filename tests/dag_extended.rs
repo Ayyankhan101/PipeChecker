@@ -5,21 +5,16 @@ use pipechecker::models::{Job, Pipeline, Provider};
 
 #[test]
 fn test_self_loop() {
-    // Job depends on itself → cycle
     let pipeline = Pipeline {
         provider: Provider::GitHubActions,
         jobs: vec![Job {
             id: "A".to_string(),
-            name: None,
-            depends_on: vec!["A".to_string()], // self依赖
-            steps: vec![],
-            env: vec![],
-            container_image: None,
-            service_images: vec![],
-            timeout_minutes: None,
+            depends_on: vec!["A".to_string()],
+            ..Default::default()
         }],
         env: vec![],
         source: "jobs:\n  A:\n    needs: [A]".to_string(),
+        ..Default::default()
     };
 
     let issues = dag::audit(&pipeline).unwrap();
@@ -33,49 +28,32 @@ fn test_self_loop() {
 
 #[test]
 fn test_three_node_cycle() {
-    // A → B → C → A
     let pipeline = Pipeline {
         provider: Provider::GitHubActions,
         jobs: vec![
             Job {
                 id: "A".to_string(),
-                name: None,
                 depends_on: vec!["B".to_string()],
-                steps: vec![],
-                env: vec![],
-                container_image: None,
-                service_images: vec![],
-                timeout_minutes: None,
+                ..Default::default()
             },
             Job {
                 id: "B".to_string(),
-                name: None,
                 depends_on: vec!["C".to_string()],
-                steps: vec![],
-                env: vec![],
-                container_image: None,
-                service_images: vec![],
-                timeout_minutes: None,
+                ..Default::default()
             },
             Job {
                 id: "C".to_string(),
-                name: None,
                 depends_on: vec!["A".to_string()],
-                steps: vec![],
-                env: vec![],
-                container_image: None,
-                service_images: vec![],
-                timeout_minutes: None,
+                ..Default::default()
             },
         ],
         env: vec![],
         source: "".to_string(),
+        ..Default::default()
     };
 
     let issues = dag::audit(&pipeline).unwrap();
-    // cycle detected, at least one issue
     assert!(!issues.is_empty());
-    // The cycle should be reported involving one of the jobs
     let jobs_in_issues: Vec<_> = issues
         .iter()
         .filter_map(|i| i.location.as_ref()?.job.as_ref())
@@ -87,14 +65,13 @@ fn test_three_node_cycle() {
 
 #[test]
 fn test_four_node_cycle() {
-    // A → B → C → D → A
     let pipeline = Pipeline {
         provider: Provider::GitHubActions,
         jobs: vec![
             Job {
                 id: "A".to_string(),
                 depends_on: vec!["B".to_string()],
-                /* other fields blank */ ..Default::default()
+                ..Default::default()
             },
             Job {
                 id: "B".to_string(),
@@ -114,6 +91,7 @@ fn test_four_node_cycle() {
         ],
         env: vec![],
         source: "".to_string(),
+        ..Default::default()
     };
 
     let issues = dag::audit(&pipeline).unwrap();
@@ -122,7 +100,6 @@ fn test_four_node_cycle() {
 
 #[test]
 fn test_multiple_independent_cycles() {
-    // Two independent cycles: A→A (self-loop) and B→C→B
     let pipeline = Pipeline {
         provider: Provider::GitHubActions,
         jobs: vec![
@@ -144,20 +121,18 @@ fn test_multiple_independent_cycles() {
         ],
         env: vec![],
         source: "".to_string(),
+        ..Default::default()
     };
 
     let issues = dag::audit(&pipeline).unwrap();
-    // Should detect at least 2 issues (two cycles). The algorithm might flag each node in a cycle; but at least 2.
     assert!(issues.len() >= 2);
     let messages: Vec<_> = issues.iter().map(|i| i.message.clone()).collect();
-    // Both cycles should be reported
     assert!(messages.iter().any(|m| m.contains("A")));
     assert!(messages.iter().any(|m| m.contains("B") || m.contains("C")));
 }
 
 #[test]
 fn test_large_dag_no_cycles() {
-    // 20 jobs, linear chain A→B→C→... no cycles
     let mut jobs = Vec::new();
     let mut prev: Option<String> = None;
     for i in 0..20 {
@@ -170,13 +145,8 @@ fn test_large_dag_no_cycles() {
         prev = Some(id.clone());
         jobs.push(Job {
             id,
-            name: None,
             depends_on,
-            steps: vec![],
-            env: vec![],
-            container_image: None,
-            service_images: vec![],
-            timeout_minutes: None,
+            ..Default::default()
         });
     }
     let pipeline = Pipeline {
@@ -184,6 +154,7 @@ fn test_large_dag_no_cycles() {
         jobs,
         env: vec![],
         source: "".to_string(),
+        ..Default::default()
     };
 
     let issues = dag::audit(&pipeline).unwrap();
@@ -195,7 +166,6 @@ fn test_large_dag_no_cycles() {
 
 #[test]
 fn test_indirect_dependency_cycle() {
-    // A → B → C → A (indirect)
     let pipeline = Pipeline {
         provider: Provider::GitHubActions,
         jobs: vec![
@@ -217,6 +187,7 @@ fn test_indirect_dependency_cycle() {
         ],
         env: vec![],
         source: "".to_string(),
+        ..Default::default()
     };
 
     let issues = dag::audit(&pipeline).unwrap();
@@ -242,6 +213,7 @@ fn test_cycle_location_points_to_job_in_cycle() {
         ],
         env: vec![],
         source: "jobs:\n  A:\n    needs: [B]\n  B:\n    needs: [A]".to_string(),
+        ..Default::default()
     };
 
     let issues = dag::audit(&pipeline).unwrap();
@@ -279,6 +251,7 @@ fn test_no_cycle_with_diamond_dependency() {
         ],
         env: vec![],
         source: "".to_string(),
+        ..Default::default()
     };
 
     let issues = dag::audit(&pipeline).unwrap();

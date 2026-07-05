@@ -1,17 +1,7 @@
-stages:
-  - test
-  - lint
-
-test:
-  stage: test
-  image: node:20-alpine
-  script:
-    - npm ci
-    - npm test
-
-lint:
-  stage: lint
-  image: node:20-alpine
-  script:
-    - npm ci
-    - npm run lint
+name: Test CI
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo test

@@ -53,6 +53,12 @@ pub struct Rules {
 
     #[serde(default = "default_true")]
     pub artifacts_check: bool,
+
+    #[serde(default = "default_true")]
+    pub deprecated_feature_check: bool,
+
+    #[serde(default = "default_true")]
+    pub cost_efficiency_check: bool,
 }
 
 fn default_true() -> bool {
@@ -70,6 +76,8 @@ impl Default for Rules {
             schema_validation: true,
             concurrency_validation: true,
             artifacts_check: true,
+            deprecated_feature_check: true,
+            cost_efficiency_check: true,
         }
     }
 }
@@ -92,6 +100,19 @@ pub fn load() -> Config {
                     return config;
                 }
             }
+        }
+    }
+
+    Config::default()
+}
+
+/// Load configuration from a specific path
+///
+/// Returns default config if the file doesn't exist or can't be parsed.
+pub fn load_from(path: &str) -> Config {
+    if let Ok(content) = fs::read_to_string(path) {
+        if let Ok(config) = serde_yaml::from_str(&content) {
+            return config;
         }
     }
 

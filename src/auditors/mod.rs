@@ -12,8 +12,12 @@
 
 pub mod artifacts;
 pub mod concurrency;
+pub mod cost;
 pub mod dag;
+pub mod deprecated;
+pub mod docker;
 pub mod include;
+pub mod matrix;
 pub mod permissions;
 pub mod schema;
 pub mod secrets;

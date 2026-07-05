@@ -23,6 +23,7 @@ fn create_test_job(id: &str, needs: Vec<String>) -> Job {
         container_image: None,
         service_images: vec![],
         timeout_minutes: None,
+        rules: vec![],
     }
 }
 
@@ -32,6 +33,10 @@ fn make_pipeline(jobs: Vec<Job>) -> Pipeline {
         jobs,
         env: vec![],
         source: String::new(),
+        is_reusable: false,
+        workflow_call_inputs: vec![],
+        workflow_call_secrets: vec![],
+        workflow_rules: vec![],
     }
 }
 

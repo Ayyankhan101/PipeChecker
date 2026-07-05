@@ -342,6 +342,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: "invalid: [}\n".to_string(),
+            is_reusable: false,
+            workflow_call_inputs: Vec::new(),
+            workflow_call_secrets: Vec::new(),
+            workflow_rules: Vec::new(),
         };
 
         let issues = audit(&pipeline).unwrap();
@@ -356,6 +360,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: "on: push\n".to_string(),
+            is_reusable: false,
+            workflow_call_inputs: Vec::new(),
+            workflow_call_secrets: Vec::new(),
+            workflow_rules: Vec::new(),
         };
 
         let issues = audit(&pipeline).unwrap();
@@ -369,6 +377,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: "jobs:\n  build:\n    docker:\n      - image: node:18\n".to_string(),
+            is_reusable: false,
+            workflow_call_inputs: Vec::new(),
+            workflow_call_secrets: Vec::new(),
+            workflow_rules: Vec::new(),
         };
 
         let issues = audit(&pipeline).unwrap();

@@ -32,7 +32,7 @@ pub mod parsers;
 pub mod tui;
 
 pub use config::load as load_config;
-pub use config::{Config, Rules};
+pub use config::{load_from, Config, Rules};
 pub use error::{PipecheckError, Result};
 pub use models::{rule_codes, AuditOptions, AuditResult, Issue, Severity};
 
@@ -131,6 +131,11 @@ pub fn audit_content(content: &str, options: AuditOptions) -> Result<AuditResult
         issues.extend(auditors::artifacts::audit(&pipeline)?);
     }
 
+    // Matrix strategy auditor — GitHub Actions only
+    if pipeline.provider == crate::models::Provider::GitHubActions {
+        issues.extend(auditors::matrix::audit(&pipeline)?);
+    }
+
     if options.check_docker_images {
         // Pinning auditor — respect docker_latest_tag toggle
         if options
@@ -152,6 +157,26 @@ pub fn audit_content(content: &str, options: AuditOptions) -> Result<AuditResult
                 ));
             }
         }
+    }
+
+    // Deprecated features auditor — respect config toggle
+    if options
+        .rules
+        .as_ref()
+        .map(|r| r.deprecated_feature_check)
+        .unwrap_or(true)
+    {
+        issues.extend(auditors::deprecated::audit(&pipeline)?);
+    }
+
+    // Cost/efficiency auditor — respect config toggle
+    if options
+        .rules
+        .as_ref()
+        .map(|r| r.cost_efficiency_check)
+        .unwrap_or(true)
+    {
+        issues.extend(auditors::cost::audit(&pipeline)?);
     }
 
     let summary = generate_summary(&issues);

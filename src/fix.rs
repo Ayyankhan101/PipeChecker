@@ -20,20 +20,82 @@ const KNOWN_ACTIONS: &[(&str, &str)] = &[
     ),
     ("actions/stale", "actions/stale@v9"),
     ("actions/labeler", "actions/labeler@v5"),
+    ("actions/setup-java", "actions/setup-java@v4"),
+    ("actions/setup-go", "actions/setup-go@v5"),
+    ("actions/setup-dotnet", "actions/setup-dotnet@v4"),
+    ("actions/github-script", "actions/github-script@v7"),
+    ("actions/delete-artifact", "actions/delete-artifact@v2"),
+    (
+        "actions/upload-pages-artifact",
+        "actions/upload-pages-artifact@v3",
+    ),
+    (
+        "actions/download-pages-artifact",
+        "actions/download-pages-artifact@v3",
+    ),
+    (
+        "actions/configure-aws-credentials",
+        "actions/configure-aws-credentials@v4",
+    ),
+    (
+        "aws-actions/configure-credentials",
+        "aws-actions/configure-credentials@v4",
+    ),
+    ("azure/login", "azure/login@v2"),
+    (
+        "google-github-actions/auth",
+        "google-github-actions/auth@v2",
+    ),
+    (
+        "google-github-actions/setup-gcloud",
+        "google-github-actions/setup-gcloud@v2",
+    ),
+    ("hashicorp/setup-terraform", "hashicorp/setup-terraform@v3"),
+    (
+        "slackapi/slack-github-action",
+        "slackapi/slack-github-action@v2",
+    ),
+    (
+        "peter-evans/create-pull-request",
+        "peter-evans/create-pull-request@v7",
+    ),
+    (
+        "peter-evans/commit-comment",
+        "peter-evans/commit-comment@v1",
+    ),
+    ("EndBug/add-and-commit", "EndBug/add-and-commit@v9"),
+    (
+        "peaceiris/actions-gh-pages",
+        "peaceiris/actions-gh-pages@v4",
+    ),
+    (
+        "JamesIves/github-pages-deploy-action",
+        "JamesIves/github-pages-deploy-action@v4",
+    ),
+    ("ruby/setup-ruby", "ruby/setup-ruby@v1"),
+    ("erlef/setup-beam", "erlef/setup-beam@v1"),
+    ("dtolnay/rust-toolchain", "dtolnay/rust-toolchain@stable"),
+    ("arduino/setup-arduino-cli", "arduino/setup-arduino-cli@v2"),
+    (
+        "cloudposse/github-action-setup-tf",
+        "cloudposse/github-action-setup-tf@v1",
+    ),
+    (
+        "aws-actions/amazon-ecr-login",
+        "aws-actions/amazon-ecr-login@v2",
+    ),
+    ("docker/setup-qemu-action", "docker/setup-qemu-action@v3"),
+    ("docker/metadata-action", "docker/metadata-action@v5"),
     (
         "docker/setup-buildx-action",
         "docker/setup-buildx-action@v3",
     ),
-    ("docker/login-action", "docker/login-action@v3"),
     ("docker/build-push-action", "docker/build-push-action@v6"),
+    ("docker/login-action", "docker/login-action@v3"),
     ("github/codeql-action/init", "github/codeql-action/init@v3"),
     (
         "github/codeql-action/analyze",
         "github/codeql-action/analyze@v3",
-    ),
-    (
-        "peaceiris/actions-gh-pages",
-        "peaceiris/actions-gh-pages@v4",
     ),
     (
         "softprops/action-gh-release",
@@ -67,13 +129,14 @@ const KNOWN_DOCKER_IMAGES: &[(&str, &str)] = &[
 
 /// Attempt to auto-fix a workflow file
 ///
+/// When `dry_run` is true, reports what would change without writing to disk.
 /// Returns the number of fixes applied and a description of each change.
-pub fn fix_file(path: &str) -> std::io::Result<FixResult> {
+pub fn fix_file(path: &str, dry_run: bool) -> std::io::Result<FixResult> {
     let content = fs::read_to_string(path)?;
     let has_trailing_newline = content.ends_with('\n');
     let result = fix_content(&content);
 
-    if result.fixed > 0 {
+    if !dry_run && result.fixed > 0 {
         // Exclude warning messages from being written back to the file.
         let mut cleaned: String = result
             .changes
@@ -94,7 +157,7 @@ pub fn fix_file(path: &str) -> std::io::Result<FixResult> {
 }
 
 /// Attempt to auto-fix workflow content
-fn fix_content(content: &str) -> FixResult {
+pub fn fix_content(content: &str) -> FixResult {
     let mut changes = Vec::new();
     let mut fixed = 0;
 

@@ -71,6 +71,8 @@ fn test_rules_all_disabled() {
         schema_validation: false,
         concurrency_validation: false,
         artifacts_check: false,
+        deprecated_feature_check: false,
+        cost_efficiency_check: false,
     };
     assert!(!rules.circular_dependencies);
     assert!(!rules.missing_secrets);

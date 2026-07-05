@@ -114,6 +114,10 @@ pub fn parse(content: &str) -> Result<Pipeline> {
         jobs,
         env,
         source: content.to_string(),
+        is_reusable: false,
+        workflow_call_inputs: Vec::new(),
+        workflow_call_secrets: Vec::new(),
+        workflow_rules: Vec::new(),
     })
 }
 
@@ -267,5 +271,6 @@ fn parse_job(
         container_image,
         service_images,
         timeout_minutes,
+        rules: Vec::new(),
     })
 }

@@ -1,0 +1,22 @@
+name: PR Target Example
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "This checks out base branch code without ref restriction"
+      - run: echo "Building..."
+
+  safe-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: echo "This is safe - checks out PR head"

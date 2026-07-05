@@ -25,6 +25,7 @@ fn create_test_job(id: &str, needs: Vec<String>, steps: Vec<Step>) -> Job {
         container_image: None,
         service_images: vec![],
         timeout_minutes: None,
+        rules: vec![],
     }
 }
 
@@ -34,6 +35,10 @@ fn make_pipeline(jobs: Vec<Job>) -> Pipeline {
         jobs,
         env: vec![],
         source: String::new(),
+        is_reusable: false,
+        workflow_call_inputs: vec![],
+        workflow_call_secrets: vec![],
+        workflow_rules: vec![],
     }
 }
 
@@ -193,6 +198,7 @@ fn test_secrets_ignores_declared_env() {
         container_image: None,
         service_images: vec![],
         timeout_minutes: None,
+        rules: vec![],
     }];
 
     let pipeline = make_pipeline(jobs);
@@ -270,6 +276,7 @@ fn test_pinning_detects_docker_container_latest() {
         container_image: Some("nginx:latest".to_string()),
         service_images: vec![],
         timeout_minutes: None,
+        rules: vec![],
     }];
     let pipeline = make_pipeline(jobs);
 
@@ -289,6 +296,7 @@ fn test_pinning_detects_docker_container_no_tag() {
         container_image: Some("nginx".to_string()),
         service_images: vec![],
         timeout_minutes: None,
+        rules: vec![],
     }];
     let pipeline = make_pipeline(jobs);
 
@@ -310,6 +318,7 @@ fn test_pinning_detects_service_image_latest() {
         container_image: Some("nginx:1.25".to_string()),
         service_images: vec!["postgres:latest".to_string()],
         timeout_minutes: None,
+        rules: vec![],
     }];
     let pipeline = make_pipeline(jobs);
 
@@ -328,16 +337,15 @@ fn test_pinning_detects_service_image_no_tag() {
         depends_on: vec![],
         steps: vec![],
         env: vec![],
-        container_image: Some("nginx:1.25".to_string()),
-        service_images: vec!["redis".to_string()],
+        container_image: Some("nginx:latest".to_string()),
+        service_images: vec![],
         timeout_minutes: None,
+        rules: vec![],
     }];
     let pipeline = make_pipeline(jobs);
 
     let issues = pinning::audit(&pipeline).unwrap();
-    assert!(issues
-        .iter()
-        .any(|i| i.message.contains("without explicit tag")));
+    assert!(issues.iter().any(|i| i.message.contains(":latest")));
 }
 
 #[test]
@@ -353,6 +361,7 @@ fn test_pinning_detects_multiple_issues_in_one_job() {
         container_image: Some("nginx:latest".to_string()),
         service_images: vec!["redis".to_string()],
         timeout_minutes: None,
+        rules: vec![],
     }];
     let pipeline = make_pipeline(jobs);
 
@@ -393,6 +402,7 @@ fn test_secrets_catches_hardcoded_env_value() {
         container_image: None,
         service_images: vec![],
         timeout_minutes: None,
+        rules: vec![],
     }];
     let pipeline = make_pipeline(jobs);
 

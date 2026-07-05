@@ -9,6 +9,19 @@ pub enum Provider {
     CircleCI,
 }
 
+/// GitLab CI rule condition from `rules:` blocks
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RuleCondition {
+    /// The `when:` value (e.g., "on_success", "manual", "always", "never", "delayed")
+    pub when: Option<String>,
+    /// The `if:` condition string
+    pub if_condition: Option<String>,
+    /// The `exists:` list of file paths
+    pub exists: Option<Vec<String>>,
+    /// The `allow_failure:` setting
+    pub allow_failure: Option<bool>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Severity {
     Error,
@@ -59,6 +72,12 @@ pub mod rule_codes {
     pub const CONCURRENCY_CANCEL_MISSING: &str = "PC016";
     pub const CACHE_STATIC_KEY: &str = "PC017";
     pub const ARTIFACT_NO_RETENTION: &str = "PC018";
+    pub const DEPRECATED_ACTION: &str = "PC019";
+    pub const EXCESSIVE_TIMEOUT: &str = "PC020";
+    pub const MISSING_CONCURRENCY: &str = "PC021";
+    pub const LARGE_MATRIX_NO_FAILFAST: &str = "PC022";
+    pub const PR_TARGET_INSECURE: &str = "PC023";
+    pub const REUSABLE_WORKFLOW_MISSING_INPUTS: &str = "PC024";
 }
 
 impl Issue {
@@ -235,6 +254,29 @@ pub struct Pipeline {
     pub env: Vec<EnvVar>,
     /// Raw YAML content, for computing line locations
     pub source: String,
+    /// Whether this is a reusable workflow (GitHub Actions `on: workflow_call`)
+    pub is_reusable: bool,
+    /// Inputs defined in `workflow_call` trigger (GitHub Actions)
+    pub workflow_call_inputs: Vec<String>,
+    /// Secrets defined in `workflow_call` trigger (GitHub Actions)
+    pub workflow_call_secrets: Vec<String>,
+    /// GitLab CI workflow:rules parsed from top-level `workflow:rules:`
+    pub workflow_rules: Vec<RuleCondition>,
+}
+
+impl Default for Pipeline {
+    fn default() -> Self {
+        Self {
+            provider: Provider::GitHubActions,
+            jobs: vec![],
+            env: vec![],
+            source: String::new(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -250,6 +292,8 @@ pub struct Job {
     pub service_images: Vec<String>,
     /// Timeout in minutes for the job (GitHub Actions `timeout-minutes`)
     pub timeout_minutes: Option<u64>,
+    /// GitLab CI `rules:` conditions
+    pub rules: Vec<RuleCondition>,
 }
 
 #[derive(Debug, Clone)]
@@ -368,6 +412,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
         };
 
         let (line, col) = pipeline.find_line("jobs:");
@@ -383,6 +431,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
         };
 
         let (line, col) = pipeline.find_line("runs-on:");
@@ -398,6 +450,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
         };
 
         let (line, col) = pipeline.find_line("missing:");
@@ -416,6 +472,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
         };
 
         let (line, col) = pipeline.find_job_line("build", "runs-on");
@@ -433,6 +493,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
         };
 
         let (line, _col) = pipeline.find_job_line("build", "runs-on");
@@ -449,6 +513,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
         };
 
         let (line, col) = pipeline.find_job_line("deploy", "runs-on");
@@ -464,6 +532,10 @@ mod tests {
             jobs: vec![],
             env: vec![],
             source: source.to_string(),
+            is_reusable: false,
+            workflow_call_inputs: vec![],
+            workflow_call_secrets: vec![],
+            workflow_rules: vec![],
         };
 
         let (line, col) = pipeline.find_job_line("deploy", "steps");
@@ -549,6 +621,7 @@ mod tests {
             container_image: None,
             service_images: vec![],
             timeout_minutes: None,
+            rules: vec![],
         };
 
         assert_eq!(job.depends_on.len(), 2);
@@ -567,6 +640,7 @@ mod tests {
             container_image: Some("node:18".to_string()),
             service_images: vec!["postgres:15".to_string(), "redis:7".to_string()],
             timeout_minutes: None,
+            rules: vec![],
         };
 
         assert_eq!(job.container_image, Some("node:18".to_string()));
